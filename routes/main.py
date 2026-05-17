@@ -714,6 +714,10 @@ def settle(group_id):
         flash('You can only settle your own debts.', 'error')
         return redirect(url_for('main.group_dashboard', group_id=group_id))
 
+    Membership.query.filter_by(
+        group_id=group_id, user_id=creditor_id
+    ).first_or_404()
+
     splits = (
         ExpenseSplit.query
         .join(Expense, Expense.id == ExpenseSplit.expense_id)
