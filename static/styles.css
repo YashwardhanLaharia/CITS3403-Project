@@ -180,10 +180,10 @@
 
     .welcome-title {
       font-family: 'Syne', sans-serif;
-      font-size: 2.4rem;
-      font-weight: 800;
+      font-size: 1.8rem;
+      font-weight: 600;
       color: var(--text-primary);
-      line-height: 1.1;
+      line-height: 1.2;
       margin-bottom: 8px;
     }
 
@@ -215,8 +215,8 @@
 
     .net-balance-amount {
       font-family: 'Syne', sans-serif;
-      font-size: 1.8rem;
-      font-weight: 800;
+      font-size: 1.6rem;
+      font-weight: 600;
       color: var(--text-primary);
     }
 
@@ -244,7 +244,7 @@
 
     .form-card-title {
       font-family: 'Syne', sans-serif;
-      font-weight: 700;
+      font-weight: 600;
       font-size: 1rem;
       color: var(--text-primary);
       margin-bottom: 18px;
@@ -389,7 +389,7 @@
       border: 1px solid rgba(96,165,250,0.2);
       border-radius: 10px;
       padding: 12px 16px;
-      font-family: 'Syne', sans-serif;
+      font-family: 'DM Sans', sans-serif;
       font-size: 1.1rem;
       font-weight: 700;
       color: #60a5fa;
@@ -465,7 +465,7 @@
 
     .section-title {
       font-family: 'Syne', sans-serif;
-      font-weight: 700;
+      font-weight: 600;
       font-size: 1rem;
       color: var(--text-primary);
     }
@@ -699,8 +699,8 @@
 
     .brand-tagline {
       font-family: 'Syne', sans-serif;
-      font-weight: 800;
-      font-size: 2rem;
+      font-weight: 700;
+      font-size: 1.75rem;
       color: var(--text-primary);
       line-height: 1.2;
       margin-bottom: 16px;
@@ -755,8 +755,8 @@
 
     .login-heading {
       font-family: 'Syne', sans-serif;
-      font-weight: 800;
-      font-size: 1.75rem;
+      font-weight: 600;
+      font-size: 1.5rem;
       color: var(--text-primary);
       margin-bottom: 6px;
     }
@@ -1001,8 +1001,8 @@
 
     .hero-title {
       font-family: 'Syne', sans-serif;
-      font-weight: 800;
-      font-size: 1.8rem;
+      font-weight: 600;
+      font-size: 1.5rem;
       color: var(--text-primary);
       margin-bottom: 8px;
     }
@@ -1034,8 +1034,8 @@
 
     .spending-amount {
       font-family: 'Syne', sans-serif;
-      font-size: 2.2rem;
-      font-weight: 800;
+      font-size: 1.8rem;
+      font-weight: 600;
       color: var(--text-primary);
       line-height: 1;
       margin-bottom: 12px;
@@ -1495,7 +1495,7 @@
       align-items: center;
       justify-content: center;
       font-family: 'Syne', sans-serif;
-      font-weight: 800;
+      font-weight: 700;
       font-size: 1.6rem;
       color: #fff;
       flex-shrink: 0;
