@@ -234,7 +234,19 @@ def _compute_group_data(members_by_id, expenses):
         for cat, amount in sorted(category_totals.items(), key=lambda x: -x[1])
     ]
 
-    # Greedy settlement: repeatedly match largest debtor with largest creditor
+    unpaid_splits = {}
+    for expense in expenses:
+        for split in expense.splits:
+            if not split.is_paid:
+                key = (split.user_id, expense.paid_by)
+                if key not in unpaid_splits:
+                    unpaid_splits[key] = []
+                unpaid_splits[key].append({
+                    'id': split.id,
+                    'amount': float(split.share_amount),
+                    'description': expense.description,
+                })
+
     raw_balances = {uid: paid_totals.get(uid, 0.0) - share_totals.get(uid, 0.0)
                     for uid in members_by_id}
     creditors = [[uid, bal] for uid, bal in sorted(raw_balances.items(), key=lambda x: -x[1]) if bal > 0.005]
@@ -246,12 +258,14 @@ def _compute_group_data(members_by_id, expenses):
         debtor_id, debt = debtors[i]
         creditor_id, credit = creditors[j]
         amount = min(debt, credit)
+        splits_list = unpaid_splits.get((debtor_id, creditor_id), [])
         transfers.append({
             'from_name': members_by_id[debtor_id].display_name,
             'to_name': members_by_id[creditor_id].display_name,
             'amount': round(amount, 2),
             'debtor_id': debtor_id,
             'creditor_id': creditor_id,
+            'splits': splits_list,
         })
         debtors[i][1] -= amount
         creditors[j][1] -= amount
