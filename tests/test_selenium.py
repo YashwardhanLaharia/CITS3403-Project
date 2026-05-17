@@ -130,11 +130,36 @@ class TestSignup:
 
     def test_signup_duplicate_email(self, app, driver):
         """Register twice with the same email, verify error message shows."""
-        pytest.skip("not implemented")
+        _seed_user(app, email='dupe@example.com')
+        driver.get(BASE_URL + '/signup')
+        driver.find_element(By.NAME, 'first_name').send_keys('Another')
+        driver.find_element(By.NAME, 'last_name').send_keys('User')
+        driver.find_element(By.NAME, 'email').send_keys('dupe@example.com')
+        driver.find_element(By.NAME, 'password').send_keys('Password123!')
+        driver.find_element(By.NAME, 'confirm_password').send_keys('Password123!')
+        driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element(
+                (By.TAG_NAME, 'body'), 'An account with this email already exists'
+            )
+        )
+        assert '/signup' in driver.current_url
 
     def test_signup_password_mismatch(self, app, driver):
         """Mismatched confirm password, verify form shows validation error."""
-        pytest.skip("not implemented")
+        driver.get(BASE_URL + '/signup')
+        driver.find_element(By.NAME, 'first_name').send_keys('Test')
+        driver.find_element(By.NAME, 'last_name').send_keys('User')
+        driver.find_element(By.NAME, 'email').send_keys('mismatch@example.com')
+        driver.find_element(By.NAME, 'password').send_keys('Password123!')
+        driver.find_element(By.NAME, 'confirm_password').send_keys('DifferentPass!')
+        driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element(
+                (By.TAG_NAME, 'body'), 'Passwords do not match'
+            )
+        )
+        assert '/signup' in driver.current_url
 
     def test_signup_missing_fields(self, app, driver):
         """Submit with required fields blank, verify browser validation."""
@@ -151,11 +176,23 @@ class TestLogin:
 
     def test_login_wrong_password(self, app, driver):
         """Wrong password shows an error flash, stays on login page."""
-        pytest.skip("not implemented")
+        _seed_user(app, email='wrongpw@example.com')
+        driver.get(BASE_URL + '/login')
+        driver.find_element(By.NAME, 'email').send_keys('wrongpw@example.com')
+        driver.find_element(By.NAME, 'password').send_keys('WrongPassword!')
+        driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element(
+                (By.TAG_NAME, 'body'), 'Invalid email or password'
+            )
+        )
+        assert '/login' in driver.current_url
 
     def test_protected_page_redirects_to_login(self, app, driver):
         """Hitting /profile without auth redirects to /login."""
-        pytest.skip("not implemented")
+        driver.get(BASE_URL + '/profile')
+        WebDriverWait(driver, 10).until(EC.url_contains('/login'))
+        assert '/login' in driver.current_url
 
     def test_logout(self, app, driver):
         """Log out via sidebar, verify redirect to login page."""
