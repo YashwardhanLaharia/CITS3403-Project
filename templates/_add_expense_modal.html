@@ -5,7 +5,7 @@
         <h5 class="modal-title" id="addExpenseModalLabel"><i class="bi bi-receipt"></i> Add Expense</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <form action="{{ url_for('main.add_expense', group_id=group.id) }}" method="POST">
+      <form id="addExpenseForm" action="{{ url_for('main.add_expense', group_id=group.id) }}" method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-body" style="padding:1.5rem;">
           <div style="margin-bottom:1rem;">

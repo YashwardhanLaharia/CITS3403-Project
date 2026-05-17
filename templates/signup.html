@@ -33,15 +33,6 @@
     <div class="login-heading">Create an account</div>
     <div class="login-sub">Join SplitMate - it's free, always.</div>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% for category, message in messages %}
-        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
-          {{ message }}
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-      {% endfor %}
-    {% endwith %}
-
     <form action="{{ url_for('main.signup') }}" method="POST">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
       <div class="field-row-2 field-group">

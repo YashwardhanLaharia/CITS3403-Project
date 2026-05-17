@@ -1,7 +1,7 @@
 import re
 from datetime import datetime, date
-from flask import Blueprint, render_template, request, flash, redirect, url_for
-from flask_login import login_required, current_user
+from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
+from flask_login import login_required, current_user, logout_user
 from sqlalchemy import func
 from extensions import db, login_manager
 from models import User, Group, Membership, Expense, ExpenseSplit
@@ -97,7 +97,7 @@ def login():
 
         if not errors:
             user = User.query.filter_by(email=email).first()
-            if user and user.check_password(password):
+            if user and user.status == 'active' and user.check_password(password):
                 from flask_login import login_user
                 login_user(user, remember=bool(remember))
                 next_page = request.args.get('next')
@@ -171,32 +171,16 @@ def logout():
     return redirect(url_for('main.login'))
 
 
-@main_bp.route('/groups/<int:group_id>')
-@login_required
-def group_dashboard(group_id):
-    membership = Membership.query.filter_by(
-        group_id=group_id, user_id=current_user.id
-    ).first_or_404()
+def _compute_group_data(members_by_id, expenses):
+    """Compute per-member balances, category distribution, and settlement transfers.
 
-    group = membership.group
-
-    memberships = Membership.query.filter_by(group_id=group_id).all()
-    members_by_id = {m.user_id: m.user for m in memberships}
-
-    expenses = (
-        Expense.query
-        .filter_by(group_id=group_id)
-        .order_by(Expense.date.desc())
-        .all()
-    )
-
-    # Per-member balances
-    paid_totals = {}
-    share_totals = {}
-    for uid in members_by_id:
-        paid_totals[uid] = 0.0
-        share_totals[uid] = 0.0
-
+    Returns (members, categories, transfers, total_spent).
+    members dicts have keys: id, name, initials, paid, balance.
+    categories dicts have keys: name, amount, pct.
+    transfers dicts have keys: from_name, to_name, amount.
+    """
+    paid_totals = {uid: 0.0 for uid in members_by_id}
+    share_totals = {uid: 0.0 for uid in members_by_id}
     category_totals = {}
     total_spent = 0.0
 
@@ -209,46 +193,37 @@ def group_dashboard(group_id):
         for split in expense.splits:
             share_totals[split.user_id] = share_totals.get(split.user_id, 0.0) + float(split.share_amount)
 
-    members = []
-    for uid, user in members_by_id.items():
-        balance = paid_totals.get(uid, 0.0) - share_totals.get(uid, 0.0)
-        members.append({
+    members = [
+        {
             'id': uid,
-            'name': f'{user.first_name} {user.last_name}',
+            'name': user.display_name,
             'initials': f'{user.first_name[0]}{user.last_name[0]}'.upper(),
             'paid': paid_totals.get(uid, 0.0),
-            'balance': balance,
-        })
+            'balance': paid_totals.get(uid, 0.0) - share_totals.get(uid, 0.0),
+        }
+        for uid, user in members_by_id.items()
+    ]
 
-    # Category distribution
-    categories = []
-    for cat, amount in sorted(category_totals.items(), key=lambda x: -x[1]):
-        pct = (amount / total_spent * 100) if total_spent else 0
-        categories.append({'name': cat, 'amount': amount, 'pct': round(pct, 1)})
+    categories = [
+        {'name': cat, 'amount': amount, 'pct': round(amount / total_spent * 100, 1) if total_spent else 0}
+        for cat, amount in sorted(category_totals.items(), key=lambda x: -x[1])
+    ]
 
-    # Settlement: greedy algorithm
-    balances = {uid: paid_totals.get(uid, 0.0) - share_totals.get(uid, 0.0)
-                for uid in members_by_id}
-    creditors = sorted(
-        [(uid, bal) for uid, bal in balances.items() if bal > 0.005],
-        key=lambda x: -x[1]
-    )
-    debtors = sorted(
-        [(uid, -bal) for uid, bal in balances.items() if bal < -0.005],
-        key=lambda x: -x[1]
-    )
+    # Greedy settlement: repeatedly match largest debtor with largest creditor
+    raw_balances = {uid: paid_totals.get(uid, 0.0) - share_totals.get(uid, 0.0)
+                    for uid in members_by_id}
+    creditors = [[uid, bal] for uid, bal in sorted(raw_balances.items(), key=lambda x: -x[1]) if bal > 0.005]
+    debtors = [[uid, -bal] for uid, bal in sorted(raw_balances.items(), key=lambda x: x[1]) if bal < -0.005]
 
     transfers = []
-    creditors = [[uid, amt] for uid, amt in creditors]
-    debtors = [[uid, amt] for uid, amt in debtors]
     i, j = 0, 0
     while i < len(debtors) and j < len(creditors):
         debtor_id, debt = debtors[i]
         creditor_id, credit = creditors[j]
         amount = min(debt, credit)
         transfers.append({
-            'from_name': f'{members_by_id[debtor_id].first_name} {members_by_id[debtor_id].last_name}',
-            'to_name': f'{members_by_id[creditor_id].first_name} {members_by_id[creditor_id].last_name}',
+            'from_name': members_by_id[debtor_id].display_name,
+            'to_name': members_by_id[creditor_id].display_name,
             'amount': round(amount, 2),
         })
         debtors[i][1] -= amount
@@ -257,6 +232,22 @@ def group_dashboard(group_id):
             i += 1
         if creditors[j][1] < 0.005:
             j += 1
+
+    return members, categories, transfers, total_spent
+
+
+@main_bp.route('/groups/<int:group_id>')
+@login_required
+def group_dashboard(group_id):
+    membership = Membership.query.filter_by(
+        group_id=group_id, user_id=current_user.id
+    ).first_or_404()
+
+    group = membership.group
+    members_by_id = {m.user_id: m.user for m in Membership.query.filter_by(group_id=group_id).all()}
+    expenses = Expense.query.filter_by(group_id=group_id).order_by(Expense.date.desc()).all()
+
+    members, categories, transfers, total_spent = _compute_group_data(members_by_id, expenses)
 
     return render_template(
         'dashboard.html',
@@ -270,11 +261,70 @@ def group_dashboard(group_id):
     )
 
 
+@main_bp.route('/groups/<int:group_id>/data')
+@login_required
+def group_data(group_id):
+    Membership.query.filter_by(
+        group_id=group_id, user_id=current_user.id
+    ).first_or_404()
+
+    group = Group.query.get_or_404(group_id)
+    members_by_id = {m.user_id: m.user for m in Membership.query.filter_by(group_id=group_id).all()}
+    expenses = Expense.query.filter_by(group_id=group_id).order_by(Expense.date.desc()).all()
+
+    members, categories, transfers, total_spent = _compute_group_data(members_by_id, expenses)
+
+    return jsonify({
+        'group': {
+            'id': group.id,
+            'name': group.name,
+            'currency': group.currency,
+            'invite_code': group.invite_code,
+            'total_spent': total_spent,
+        },
+        'members': [
+            {
+                'id': m['id'],
+                'name': m['name'],
+                'initials': m['initials'],
+                'amount_paid': m['paid'],
+                'balance': m['balance'],
+            }
+            for m in members
+        ],
+        'expenses': [
+            {
+                'id': e.id,
+                'description': e.description,
+                'amount': float(e.amount),
+                'category': e.category,
+                'date': e.date.strftime('%Y-%m-%d'),
+                'paid_by': e.payer.display_name,
+            }
+            for e in expenses
+        ],
+        'categories': [
+            {
+                'name': c['name'],
+                'amount': c['amount'],
+                'percentage': c['pct'],
+            }
+            for c in categories
+        ],
+        'transfers': [
+            {
+                'from': t['from_name'],
+                'to': t['to_name'],
+                'amount': t['amount'],
+            }
+            for t in transfers
+        ],
+    })
+
+
 @main_bp.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile():
-    from flask_login import current_user
-
     if request.method == 'POST':
         first_name = request.form.get('first_name', '').strip()
         last_name = request.form.get('last_name', '').strip()
@@ -304,7 +354,6 @@ def profile():
             current_user.last_name = last_name
             if new_password:
                 current_user.set_password(new_password)
-                from flask_login import logout_user
                 db.session.commit()
                 logout_user()
                 flash('Profile updated. Please log in with your new password.', 'success')
@@ -323,6 +372,27 @@ def profile():
                            last_name=current_user.last_name,
                            email=current_user.email,
                            created_at=current_user.created_at)
+
+
+@main_bp.route('/profile/delete', methods=['POST'])
+@login_required
+def delete_account():
+    delete_password = request.form.get('delete_password', '')
+    if not delete_password:
+        flash('Current password is required to delete your account.', 'error')
+        return redirect(url_for('main.profile'))
+
+    if not current_user.check_password(delete_password):
+        flash('The password you entered is incorrect.', 'error')
+        return redirect(url_for('main.profile'))
+
+    current_user.status = 'deleted'
+    current_user.deleted_at = datetime.utcnow()
+    current_user.email = None
+    db.session.commit()
+    logout_user()
+    flash('Your account was deleted. The data you contributed remains in shared groups.', 'info')
+    return redirect(url_for('main.login'))
 
 
 @main_bp.route('/groups/join', methods=['POST'])
@@ -430,6 +500,8 @@ def add_expense(group_id):
         except ValueError:
             errors.append('Invalid date format.')
 
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
     members = Membership.query.filter_by(group_id=group_id).all()
 
     split_amounts = {}
@@ -451,6 +523,8 @@ def add_expense(group_id):
             errors.append('Split amounts must add up to the total expense amount.')
 
     if errors:
+        if is_ajax:
+            return jsonify({'success': False, 'errors': errors}), 400
         for e in errors:
             flash(e, 'error')
         return redirect(url_for('main.group_dashboard', group_id=group_id))
@@ -487,6 +561,8 @@ def add_expense(group_id):
 
     db.session.commit()
 
+    if is_ajax:
+        return jsonify({'success': True})
     flash(f'Expense "{description}" added successfully!', 'success')
     return redirect(url_for('main.group_dashboard', group_id=group_id))
 

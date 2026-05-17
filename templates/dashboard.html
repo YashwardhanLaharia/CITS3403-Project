@@ -23,7 +23,7 @@
     <div class="welcome-row">
       <div>
         <div class="welcome-title">{{ group.name }}</div>
-        <div class="welcome-sub">{{ members|length }} member{{ 's' if members|length != 1 }} &middot; {{ group.currency }} &middot; Total spent: ${{ "%.2f"|format(total_spent) }}</div>
+        <div id="group-summary" class="welcome-sub">{{ members|length }} member{{ 's' if members|length != 1 }} &middot; {{ group.currency }} &middot; Total spent: ${{ "%.2f"|format(total_spent) }}</div>
       </div>
       <div class="net-balance-card">
         <div class="net-balance-label">Invite Code</div>
@@ -39,7 +39,7 @@
       </div>
     </div>
 
-    <div class="groups-grid">
+    <div id="member-balances-grid" class="groups-grid">
       {% if members %}
         {% for m in members %}
         <div class="group-card">
@@ -105,7 +105,7 @@
       </div>
     </div>
 
-    <div class="archived-grid">
+    <div id="expense-feed" class="archived-grid">
       {% if expenses %}
         {% for e in expenses %}
         <div class="archived-card">
@@ -119,9 +119,9 @@
           </div>
           <div>
             <div class="archived-name">{{ e.description }}</div>
-            <div class="archived-meta">
-              ${{ "%.2f"|format(e.amount) }} &middot; {{ e.category }} &middot; {{ e.date.strftime('%d %b %Y') }} &middot; paid by {{ e.payer.first_name }}
-            </div>
+              <div class="archived-meta">
+                ${{ "%.2f"|format(e.amount) }} &middot; {{ e.category }} &middot; {{ e.date.strftime('%d %b %Y') }} &middot; paid by {{ e.payer.display_name }}
+              </div>
           </div>
         </div>
         {% endfor %}
@@ -143,7 +143,7 @@
       </div>
     </div>
 
-    <div class="archived-grid">
+    <div id="settlement-preview" class="archived-grid">
       {% if transfers %}
         {% for t in transfers %}
         <div class="archived-card">
@@ -170,4 +170,8 @@
 
 {% include '_create_group_modal.html' %}
 {% include '_add_expense_modal.html' %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='main.js') }}"></script>
+{% endblock %}
 {% endblock %}
