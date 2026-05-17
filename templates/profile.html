@@ -26,6 +26,10 @@
     <div class="form-card" style="max-width:560px;">
       <div class="form-card-title"><i class="bi bi-person-circle"></i> Account Details</div>
 
+      <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 18px;">
+        <i class="bi bi-calendar3"></i> Member since: {{ created_at.strftime('%B %Y') }}
+      </div>
+
       <form method="POST" action="{{ url_for('main.profile') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <div class="field-row-2 field-group">
