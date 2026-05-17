@@ -26,7 +26,7 @@ def index():
     groups_by_id = {m.group_id: m.group for m in memberships}
 
     if not group_ids:
-        return render_template('index.html', first_name=current_user.first_name, groups=[], net_balance=0.0)
+        return render_template('index.html', first_name=current_user.first_name, groups=[], net_balance=0.0, active_page='home')
 
     member_counts = dict(
         db.session.query(Membership.group_id, func.count(Membership.id))
@@ -79,6 +79,7 @@ def index():
         first_name=current_user.first_name,
         groups=groups,
         net_balance=net_balance,
+        active_page='home',
     )
 
 
@@ -262,6 +263,7 @@ def group_dashboard(group_id):
         transfers=transfers,
         total_spent=total_spent,
         expense_categories=EXPENSE_CATEGORIES,
+        active_page='dashboard',
     )
 
 
@@ -374,13 +376,15 @@ def profile():
                                first_name=first_name or current_user.first_name,
                                last_name=last_name or current_user.last_name,
                                email=current_user.email,
-                               created_at=current_user.created_at)
+                               created_at=current_user.created_at,
+                               active_page='profile')
 
     return render_template('profile.html',
                            first_name=current_user.first_name,
                            last_name=current_user.last_name,
                            email=current_user.email,
-                           created_at=current_user.created_at)
+                           created_at=current_user.created_at,
+                           active_page='profile')
 
 
 @main_bp.route('/profile/delete', methods=['POST'])
