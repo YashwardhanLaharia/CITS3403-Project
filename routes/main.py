@@ -726,12 +726,28 @@ def settle(group_id):
         .all()
     )
 
-    if not splits:
+    cross_splits = (
+        ExpenseSplit.query
+        .join(Expense, Expense.id == ExpenseSplit.expense_id)
+        .filter(
+            ExpenseSplit.user_id == creditor_id,
+            ExpenseSplit.is_paid == False,
+            Expense.paid_by == debtor_id,
+            Expense.group_id == group_id,
+        )
+        .all()
+    )
+
+    if not splits and not cross_splits:
         flash('No outstanding splits found.', 'error')
         return redirect(url_for('main.group_dashboard', group_id=group_id))
 
     for split in splits:
         split.is_paid = True
+
+    for split in cross_splits:
+        split.is_paid = True
+
     db.session.commit()
     flash('Settlement marked as paid.', 'success')
     return redirect(url_for('main.group_dashboard', group_id=group_id))
