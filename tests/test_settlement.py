@@ -290,3 +290,189 @@ def test_compute_group_data_three_member_settlement(app, user_factory):
     assert u1_data['balance'] == 60.00
     assert u2_data['balance'] == -30.00
     assert u3_data['balance'] == -30.00
+
+
+def test_settle_selective_splits(client, user_factory, group_factory, login_user):
+    debtor, _ = user_factory(email='debtor-sel@example.com')
+    creditor, _ = user_factory(email='creditor-sel@example.com')
+
+    admin, password = user_factory(email='admin-sel@example.com')
+    group = group_factory(creator=admin)
+
+    db.session.add(Membership(user_id=debtor.id, group_id=group.id, role='member'))
+    db.session.add(Membership(user_id=creditor.id, group_id=group.id, role='member'))
+    db.session.commit()
+
+    login_user(debtor.email, password)
+
+    expense1 = Expense(
+        group_id=group.id,
+        paid_by=creditor.id,
+        description='Dinner',
+        amount=50.00,
+        category='Food',
+        split_type='equal',
+        date=date(2025, 1, 1),
+    )
+    db.session.add(expense1)
+    db.session.flush()
+
+    expense2 = Expense(
+        group_id=group.id,
+        paid_by=creditor.id,
+        description='Lunch',
+        amount=30.00,
+        category='Food',
+        split_type='equal',
+        date=date(2025, 1, 2),
+    )
+    db.session.add(expense2)
+    db.session.flush()
+
+    split1 = ExpenseSplit(expense_id=expense1.id, user_id=debtor.id, share_amount=25.00)
+    split2 = ExpenseSplit(expense_id=expense2.id, user_id=debtor.id, share_amount=15.00)
+    db.session.add(split1)
+    db.session.add(split2)
+    db.session.commit()
+
+    client.post(
+        f'/groups/{group.id}/settle',
+        data={
+            'debtor_id': debtor.id,
+            'creditor_id': creditor.id,
+            'split_ids': str(split1.id),
+        },
+        follow_redirects=True,
+    )
+
+    db.session.expire_all()
+
+    split1_refresh = ExpenseSplit.query.get(split1.id)
+    split2_refresh = ExpenseSplit.query.get(split2.id)
+
+    assert split1_refresh.is_paid is True
+    assert split2_refresh.is_paid is False
+
+
+def test_settle_cross_debts_nets_correctly(client, user_factory, group_factory, login_user):
+    alice, _ = user_factory(email='alice-cross@example.com')
+    bob, _ = user_factory(email='bob-cross@example.com')
+
+    admin, password = user_factory(email='admin-cross@example.com')
+    group = group_factory(creator=admin)
+
+    db.session.add(Membership(user_id=alice.id, group_id=group.id, role='member'))
+    db.session.add(Membership(user_id=bob.id, group_id=group.id, role='member'))
+    db.session.commit()
+
+    login_user(alice.email, password)
+
+    expense1 = Expense(
+        group_id=group.id,
+        paid_by=bob.id,
+        description='Bob paid',
+        amount=80.00,
+        category='Food',
+        split_type='equal',
+        date=date(2025, 1, 1),
+    )
+    db.session.add(expense1)
+    db.session.flush()
+
+    expense2 = Expense(
+        group_id=group.id,
+        paid_by=alice.id,
+        description='Alice paid',
+        amount=50.00,
+        category='Food',
+        split_type='equal',
+        date=date(2025, 1, 2),
+    )
+    db.session.add(expense2)
+    db.session.flush()
+
+    bob_owes_alice = ExpenseSplit(expense_id=expense1.id, user_id=bob.id, share_amount=40.00)
+    alice_owes_bob = ExpenseSplit(expense_id=expense2.id, user_id=alice.id, share_amount=25.00)
+    db.session.add(bob_owes_alice)
+    db.session.add(alice_owes_bob)
+    db.session.commit()
+
+    client.post(
+        f'/groups/{group.id}/settle',
+        data={
+            'debtor_id': bob.id,
+            'creditor_id': alice.id,
+            'split_ids': '',
+        },
+        follow_redirects=True,
+    )
+
+    db.session.expire_all()
+
+    bob_owes_alice_refresh = ExpenseSplit.query.get(bob_owes_alice.id)
+    alice_owes_bob_refresh = ExpenseSplit.query.get(alice_owes_bob.id)
+
+    assert bob_owes_alice_refresh.is_paid is True
+    assert alice_owes_bob_refresh.is_paid is True
+
+
+def test_settle_partial_cross_debt(client, user_factory, group_factory, login_user):
+    alice, _ = user_factory(email='alice-partial@example.com')
+    bob, _ = user_factory(email='bob-partial@example.com')
+
+    admin, password = user_factory(email='admin-partial@example.com')
+    group = group_factory(creator=admin)
+
+    db.session.add(Membership(user_id=alice.id, group_id=group.id, role='member'))
+    db.session.add(Membership(user_id=bob.id, group_id=group.id, role='member'))
+    db.session.commit()
+
+    login_user(alice.email, password)
+
+    expense1 = Expense(
+        group_id=group.id,
+        paid_by=bob.id,
+        description='Bob paid $100',
+        amount=100.00,
+        category='Food',
+        split_type='equal',
+        date=date(2025, 1, 1),
+    )
+    db.session.add(expense1)
+    db.session.flush()
+
+    expense2 = Expense(
+        group_id=group.id,
+        paid_by=alice.id,
+        description='Alice paid $50',
+        amount=50.00,
+        category='Food',
+        split_type='equal',
+        date=date(2025, 1, 2),
+    )
+    db.session.add(expense2)
+    db.session.flush()
+
+    bob_owes_alice = ExpenseSplit(expense_id=expense1.id, user_id=bob.id, share_amount=50.00)
+    alice_owes_bob = ExpenseSplit(expense_id=expense2.id, user_id=alice.id, share_amount=25.00)
+    db.session.add(bob_owes_alice)
+    db.session.add(alice_owes_bob)
+    db.session.commit()
+
+    client.post(
+        f'/groups/{group.id}/settle',
+        data={
+            'debtor_id': bob.id,
+            'creditor_id': alice.id,
+            'split_ids': '',
+        },
+        follow_redirects=True,
+    )
+
+    db.session.expire_all()
+
+    bob_owes_alice_refresh = ExpenseSplit.query.get(bob_owes_alice.id)
+    alice_owes_bob_refresh = ExpenseSplit.query.get(alice_owes_bob.id)
+
+    assert bob_owes_alice_refresh.is_paid is True
+    assert alice_owes_bob_refresh.is_paid is False
