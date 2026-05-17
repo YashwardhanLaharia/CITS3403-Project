@@ -192,7 +192,8 @@ def _compute_group_data(members_by_id, expenses):
         cat = expense.category or 'Other'
         category_totals[cat] = category_totals.get(cat, 0.0) + amount
         for split in expense.splits:
-            share_totals[split.user_id] = share_totals.get(split.user_id, 0.0) + float(split.share_amount)
+            if not split.is_paid:
+                share_totals[split.user_id] = share_totals.get(split.user_id, 0.0) + float(split.share_amount)
 
     members = [
         {
@@ -671,6 +672,43 @@ def delete_expense(group_id, expense_id):
     db.session.delete(expense)
     db.session.commit()
     flash(f'Expense "{description}" deleted successfully!', 'success')
+    return redirect(url_for('main.group_dashboard', group_id=group_id))
+
+
+@main_bp.route('/groups/<int:group_id>/settle', methods=['POST'])
+@login_required
+def settle(group_id):
+    Membership.query.filter_by(
+        group_id=group_id, user_id=current_user.id
+    ).first_or_404()
+
+    debtor_id = request.form.get('debtor_id', type=int)
+    creditor_id = request.form.get('creditor_id', type=int)
+
+    if not debtor_id or not creditor_id:
+        flash('Invalid settlement request.', 'error')
+        return redirect(url_for('main.group_dashboard', group_id=group_id))
+
+    splits = (
+        ExpenseSplit.query
+        .join(Expense, Expense.id == ExpenseSplit.expense_id)
+        .filter(
+            ExpenseSplit.user_id == debtor_id,
+            ExpenseSplit.is_paid == False,
+            Expense.paid_by == creditor_id,
+            Expense.group_id == group_id,
+        )
+        .all()
+    )
+
+    if not splits:
+        flash('No outstanding splits found.', 'error')
+        return redirect(url_for('main.group_dashboard', group_id=group_id))
+
+    for split in splits:
+        split.is_paid = True
+    db.session.commit()
+    flash('Settlement marked as paid.', 'success')
     return redirect(url_for('main.group_dashboard', group_id=group_id))
 
 
