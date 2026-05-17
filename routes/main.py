@@ -791,19 +791,21 @@ def settle(group_id):
     net_settle = splits_total - cross_splits_total
 
     remaining = net_settle
-    for split in splits_to_settle:
-        if remaining <= 0:
-            break
-        split.is_paid = True
-        remaining -= float(split.share_amount)
-
-    if net_settle < 0:
-        remaining = abs(net_settle)
-        for split in cross_splits_to_settle:
-            if remaining <= 0:
+    if remaining > 0:
+        for split in splits_to_settle:
+            split_amount = float(split.share_amount)
+            if remaining <= split_amount:
+                remaining = 0
                 break
             split.is_paid = True
-            remaining -= float(split.share_amount)
+            remaining -= split_amount
+    elif remaining < 0:
+        for split in cross_splits_to_settle:
+            split_amount = float(split.share_amount)
+            if abs(remaining) <= split_amount:
+                break
+            split.is_paid = True
+            remaining += split_amount
 
     db.session.commit()
     flash('Settlement marked as paid.', 'success')
