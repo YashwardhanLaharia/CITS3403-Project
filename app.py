@@ -55,9 +55,11 @@ def create_app(config_name=None):
                 member_count = Membership.query.filter_by(group_id=g.id).count()
                 paid = db.session.query(func.coalesce(func.sum(Expense.amount), 0)).filter(
                     Expense.group_id == g.id, Expense.paid_by == current_user.id).scalar()
-                fair = db.session.query(func.coalesce(func.sum(ExpenseSplit.share_amount), 0)).join(
-                    Expense).filter(Expense.group_id == g.id, ExpenseSplit.user_id == current_user.id).scalar()
-                balance = float(paid) - float(fair)
+                fair = db.session.query(func.coalesce(func.sum(ExpenseSplit.share_amount - ExpenseSplit.paid_amount), 0)).join(
+                    Expense).filter(Expense.group_id == g.id, ExpenseSplit.user_id == current_user.id, ExpenseSplit.is_paid == False).scalar()
+                settled = db.session.query(func.coalesce(func.sum(ExpenseSplit.paid_amount), 0)).join(
+                    Expense).filter(Expense.group_id == g.id, Expense.paid_by == current_user.id, ExpenseSplit.paid_amount > 0).scalar()
+                balance = float(paid) - float(settled) - float(fair)
                 sidebar_groups.append({
                     'id': g.id,
                     'name': g.name,
