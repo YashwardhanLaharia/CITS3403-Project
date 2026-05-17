@@ -6,6 +6,12 @@ const CATEGORY_ICONS = {
   Utilities: '💡',
 };
 
+function esc(str) {
+  const el = document.createElement('span');
+  el.textContent = str;
+  return el.innerHTML;
+}
+
 function categoryIcon(cat) {
   return CATEGORY_ICONS[cat] || '📦';
 }
@@ -31,8 +37,8 @@ function renderMemberBalances(members) {
     return `
       <div class="group-card">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-          <div class="avatar-sm">${m.initials}</div>
-          <div class="group-card-name">${m.name}</div>
+          <div class="avatar-sm">${esc(m.initials)}</div>
+          <div class="group-card-name">${esc(m.name)}</div>
         </div>
         <div class="group-card-meta">Paid: $${m.amount_paid.toFixed(2)}</div>
         <div class="group-card-balance" style="color:${color}">${balanceText}</div>
@@ -63,8 +69,8 @@ function renderExpenseFeed(expenses) {
       <div class="archived-card">
         <div class="archived-icon">${categoryIcon(e.category)}</div>
         <div>
-          <div class="archived-name">${e.description}</div>
-          <div class="archived-meta">$${e.amount.toFixed(2)} &middot; ${e.category} &middot; ${dateStr} &middot; paid by ${e.paid_by}</div>
+          <div class="archived-name">${esc(e.description)}</div>
+          <div class="archived-meta">$${e.amount.toFixed(2)} &middot; ${esc(e.category)} &middot; ${dateStr} &middot; paid by ${esc(e.paid_by)}</div>
         </div>
       </div>`;
   }).join('');
@@ -88,7 +94,7 @@ function renderSettlement(transfers) {
     <div class="archived-card">
       <div class="archived-icon"><i class="bi bi-arrow-right-circle"></i></div>
       <div>
-        <div class="archived-name">${t.from} → ${t.to}</div>
+        <div class="archived-name">${esc(t.from)} &rarr; ${esc(t.to)}</div>
         <div class="archived-meta">$${t.amount.toFixed(2)}</div>
       </div>
     </div>`).join('');
@@ -141,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const alert = document.createElement('div');
       alert.className = 'ajax-error';
       alert.style.cssText = 'color:var(--danger,#e05252);margin-bottom:1rem;font-size:0.875rem;';
-      alert.innerHTML = data.errors.map(err => `<div>${err}</div>`).join('');
+      alert.innerHTML = data.errors.map(err => `<div>${esc(err)}</div>`).join('');
       form.querySelector('.modal-body').prepend(alert);
       return;
     }

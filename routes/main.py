@@ -1,5 +1,6 @@
 import re
 import secrets
+from urllib.parse import urlparse
 from datetime import datetime, date, timezone
 from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
 from flask_login import login_required, current_user, logout_user
@@ -102,6 +103,8 @@ def login():
                 from flask_login import login_user
                 login_user(user, remember=bool(remember))
                 next_page = request.args.get('next')
+                if next_page and urlparse(next_page).netloc:
+                    next_page = None
                 flash(f'Welcome back, {user.first_name}!', 'success')
                 return redirect(next_page or url_for('main.index'))
             else:
