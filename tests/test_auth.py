@@ -1,6 +1,8 @@
+import pytest
 from datetime import datetime, timezone
 
 from models import User, Membership
+from extensions import db
 
 
 def test_signup_validation_errors(client):
@@ -68,32 +70,34 @@ def test_index_requires_login(client):
     assert '/login' in response.headers['Location']
 
 
-def test_login_with_nonexistent_email(client):
+@pytest.mark.parametrize("credential_type,credential_value,expected_message", [
+    ("nonexistent_email", "nonexistent@example.com", "Invalid email or password."),
+    ("wrong_password", "WrongPassword123!", "Invalid email or password."),
+])
+def test_login_with_invalid_credentials(client, user_factory, credential_type, credential_value, expected_message):
+    if credential_type == "nonexistent_email":
+        email = credential_value
+        password = "anypass"
+    else:
+        user, _ = user_factory()
+        email = user.email
+        password = credential_value
+
     response = client.post(
         '/login',
-        data={'email': 'nonexistent@example.com', 'password': 'anypass'},
+        data={'email': email, 'password': password},
         follow_redirects=True,
     )
-    assert b'Invalid email or password.' in response.data
-
-
-def test_login_with_wrong_password(client, user_factory):
-    user, _ = user_factory()
-    response = client.post(
-        '/login',
-        data={'email': user.email, 'password': 'WrongPassword123!'},
-        follow_redirects=True,
-    )
-    assert b'Invalid email or password.' in response.data
+    assert expected_message.encode() in response.data
 
 
 def test_login_with_deleted_account(client, user_factory):
     user, password = user_factory()
     user_email = user.email
-    from extensions import db
     user.status = 'deleted'
     user.deleted_at = datetime.now(timezone.utc)
     user.email = None
+    from extensions import db
     db.session.commit()
 
     response = client.post(
