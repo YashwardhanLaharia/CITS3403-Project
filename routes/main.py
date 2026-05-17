@@ -53,7 +53,23 @@ def index():
     fair_shares = dict(
         db.session.query(Expense.group_id, func.coalesce(func.sum(ExpenseSplit.share_amount), 0))
         .join(ExpenseSplit, ExpenseSplit.expense_id == Expense.id)
-        .filter(Expense.group_id.in_(group_ids), ExpenseSplit.user_id == current_user.id)
+        .filter(
+            Expense.group_id.in_(group_ids),
+            ExpenseSplit.user_id == current_user.id,
+            ExpenseSplit.is_paid == False,
+        )
+        .group_by(Expense.group_id)
+        .all()
+    )
+
+    settled = dict(
+        db.session.query(Expense.group_id, func.coalesce(func.sum(ExpenseSplit.share_amount), 0))
+        .join(ExpenseSplit, ExpenseSplit.expense_id == Expense.id)
+        .filter(
+            Expense.group_id.in_(group_ids),
+            Expense.paid_by == current_user.id,
+            ExpenseSplit.is_paid == True,
+        )
         .group_by(Expense.group_id)
         .all()
     )
@@ -63,7 +79,8 @@ def index():
 
     for gid in group_ids:
         group = groups_by_id[gid]
-        user_balance = float(paid_by_user.get(gid, 0)) - float(fair_shares.get(gid, 0))
+        effective_paid = float(paid_by_user.get(gid, 0)) - float(settled.get(gid, 0))
+        user_balance = effective_paid - float(fair_shares.get(gid, 0))
         net_balance += user_balance
 
         groups.append({
@@ -196,7 +213,10 @@ def _compute_group_data(members_by_id, expenses):
         cat = expense.category or 'Other'
         category_totals[cat] = category_totals.get(cat, 0.0) + amount
         for split in expense.splits:
-            share_totals[split.user_id] = share_totals.get(split.user_id, 0.0) + float(split.share_amount)
+            if split.is_paid:
+                paid_totals[expense.paid_by] = paid_totals.get(expense.paid_by, 0.0) - float(split.share_amount)
+            else:
+                share_totals[split.user_id] = share_totals.get(split.user_id, 0.0) + float(split.share_amount)
 
     members = [
         {
@@ -230,6 +250,8 @@ def _compute_group_data(members_by_id, expenses):
             'from_name': members_by_id[debtor_id].display_name,
             'to_name': members_by_id[creditor_id].display_name,
             'amount': round(amount, 2),
+            'debtor_id': debtor_id,
+            'creditor_id': creditor_id,
         })
         debtors[i][1] -= amount
         creditors[j][1] -= amount
@@ -678,6 +700,67 @@ def delete_expense(group_id, expense_id):
     db.session.delete(expense)
     db.session.commit()
     flash(f'Expense "{description}" deleted successfully!', 'success')
+    return redirect(url_for('main.group_dashboard', group_id=group_id))
+
+
+@main_bp.route('/groups/<int:group_id>/settle', methods=['POST'])
+@login_required
+def settle(group_id):
+    Membership.query.filter_by(
+        group_id=group_id, user_id=current_user.id
+    ).first_or_404()
+
+    debtor_id = request.form.get('debtor_id', type=int)
+    creditor_id = request.form.get('creditor_id', type=int)
+
+    if not debtor_id or not creditor_id:
+        flash('Invalid settlement request.', 'error')
+        return redirect(url_for('main.group_dashboard', group_id=group_id))
+
+    if debtor_id != current_user.id:
+        flash('You can only settle your own debts.', 'error')
+        return redirect(url_for('main.group_dashboard', group_id=group_id))
+
+    Membership.query.filter_by(
+        group_id=group_id, user_id=creditor_id
+    ).first_or_404()
+
+    splits = (
+        ExpenseSplit.query
+        .join(Expense, Expense.id == ExpenseSplit.expense_id)
+        .filter(
+            ExpenseSplit.user_id == debtor_id,
+            ExpenseSplit.is_paid == False,
+            Expense.paid_by == creditor_id,
+            Expense.group_id == group_id,
+        )
+        .all()
+    )
+
+    cross_splits = (
+        ExpenseSplit.query
+        .join(Expense, Expense.id == ExpenseSplit.expense_id)
+        .filter(
+            ExpenseSplit.user_id == creditor_id,
+            ExpenseSplit.is_paid == False,
+            Expense.paid_by == debtor_id,
+            Expense.group_id == group_id,
+        )
+        .all()
+    )
+
+    if not splits and not cross_splits:
+        flash('No outstanding splits found.', 'error')
+        return redirect(url_for('main.group_dashboard', group_id=group_id))
+
+    for split in splits:
+        split.is_paid = True
+
+    for split in cross_splits:
+        split.is_paid = True
+
+    db.session.commit()
+    flash('Settlement marked as paid.', 'success')
     return redirect(url_for('main.group_dashboard', group_id=group_id))
 
 
