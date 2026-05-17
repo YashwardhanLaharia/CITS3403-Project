@@ -517,8 +517,12 @@ def test_settle_partial_cross_debt(client, user_factory, group_factory, login_us
     bob_owes_alice_refresh = ExpenseSplit.query.get(bob_owes_alice.id)
     alice_owes_bob_refresh = ExpenseSplit.query.get(alice_owes_bob.id)
 
-    assert bob_owes_alice_refresh.is_paid is False  # $50 not fully covered by $25 cash remainder
-    assert alice_owes_bob_refresh.is_paid is True   # reciprocal offset applied
+    # alice_owes_bob ($25) fully offset against bob's $50 payment → cleared
+    assert alice_owes_bob_refresh.is_paid is True
+    assert alice_owes_bob_refresh.paid_amount == alice_owes_bob_refresh.share_amount
+    # cash_due after offset = $50 - $25 = $25, which is < $50 split → partially paid
+    assert bob_owes_alice_refresh.is_paid is False
+    assert bob_owes_alice_refresh.paid_amount == 25
 
 
 def test_settle_reciprocal_larger_than_net(client, user_factory, group_factory, login_user):
@@ -609,9 +613,10 @@ def test_settle_partial_amount(client, user_factory, group_factory, login_user):
 
     db.session.expire_all()
 
-    # $10 split covered by $15 payment; $5 remainder < $30, so large split stays unpaid
+    # $10 split fully covered; $5 remainder goes into paid_amount on the $30 split
     assert ExpenseSplit.query.get(split_small.id).is_paid is True
     assert ExpenseSplit.query.get(split_large.id).is_paid is False
+    assert ExpenseSplit.query.get(split_large.id).paid_amount == 5
 
 
 def test_settle_rejects_amount_exceeding_balance(client, user_factory, group_factory, login_user):
@@ -647,3 +652,56 @@ def test_settle_rejects_amount_exceeding_balance(client, user_factory, group_fac
     assert b'Payment amount exceeds outstanding balance' in response.data
     db.session.expire_all()
     assert ExpenseSplit.query.get(split.id).is_paid is False
+
+
+def test_settle_partial_payment_reduces_transfer_amount(app, client, user_factory, group_factory, login_user):
+    # Regression: u2 owes u1 $50. u2 pays $40.
+    # Before this fix the $50 split was not marked paid (correct) but paid_amount
+    # stayed 0, so the transfer still showed $50 — the $40 was silently lost.
+    # After the fix: paid_amount=$40, is_paid=False, transfer shows $10 remaining.
+    u1, _ = user_factory(email='u1-regression@example.com')
+    u2, u2_password = user_factory(email='u2-regression@example.com')
+
+    admin, _ = user_factory(email='admin-regression@example.com')
+    group = group_factory(creator=admin)
+
+    db.session.add(Membership(user_id=u1.id, group_id=group.id, role='member'))
+    db.session.add(Membership(user_id=u2.id, group_id=group.id, role='member'))
+    db.session.commit()
+
+    expense = Expense(
+        group_id=group.id, paid_by=u1.id, description='Dinner',
+        amount=100.00, category='Food', split_type='equal', date=date(2025, 1, 1),
+    )
+    db.session.add(expense)
+    db.session.flush()
+
+    split_u1 = ExpenseSplit(expense_id=expense.id, user_id=u1.id, share_amount=50.00)
+    split_u2 = ExpenseSplit(expense_id=expense.id, user_id=u2.id, share_amount=50.00)
+    db.session.add(split_u1)
+    db.session.add(split_u2)
+    db.session.commit()
+
+    login_user(u2.email, u2_password)
+
+    client.post(
+        f'/groups/{group.id}/settle',
+        data={'debtor_id': u2.id, 'creditor_id': u1.id, 'payment_amount': '40.00'},
+        follow_redirects=True,
+    )
+
+    db.session.expire_all()
+
+    split_u2_refresh = ExpenseSplit.query.get(split_u2.id)
+    # Split not fully paid — is_paid stays False
+    assert split_u2_refresh.is_paid is False
+    # But $40 progress is recorded
+    assert split_u2_refresh.paid_amount == 40
+
+    # The transfer amount now reflects only the $10 still outstanding
+    members_by_id = {u1.id: u1, u2.id: u2}
+    expenses = Expense.query.filter_by(group_id=group.id).all()
+    _, _, transfers, _ = _compute_group_data(members_by_id, expenses)
+
+    assert len(transfers) == 1
+    assert transfers[0]['amount'] == 10.00
