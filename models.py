@@ -131,3 +131,21 @@ class ExpenseSplit(db.Model):
 
     def __repr__(self):
         return f'<ExpenseSplit expense_id={self.expense_id} user_id={self.user_id} amount={self.share_amount}>'
+
+
+class Payment(db.Model):
+    __tablename__ = 'payments'
+
+    id = db.Column(db.Integer, primary_key=True)
+    group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=False)
+    payer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    payee_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    amount = db.Column(db.Numeric(10, 2), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    group = db.relationship('Group', backref='payments')
+    payer = db.relationship('User', foreign_keys=[payer_id], backref='payments_made')
+    payee = db.relationship('User', foreign_keys=[payee_id], backref='payments_received')
+
+    def __repr__(self):
+        return f'<Payment ${self.amount} from user {self.payer_id} to user {self.payee_id}>'

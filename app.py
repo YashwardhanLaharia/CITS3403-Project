@@ -33,7 +33,7 @@ def create_app(config_name=None):
     from routes.main import main_bp
     app.register_blueprint(main_bp)
 
-    from models import User, Group, Membership, Expense, ExpenseSplit
+    from models import User, Group, Membership, Expense, ExpenseSplit, Payment
 
     @app.context_processor
     def inject_globals():
