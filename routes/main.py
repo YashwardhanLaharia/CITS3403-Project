@@ -710,6 +710,10 @@ def settle(group_id):
         flash('Invalid settlement request.', 'error')
         return redirect(url_for('main.group_dashboard', group_id=group_id))
 
+    if debtor_id != current_user.id:
+        flash('You can only settle your own debts.', 'error')
+        return redirect(url_for('main.group_dashboard', group_id=group_id))
+
     splits = (
         ExpenseSplit.query
         .join(Expense, Expense.id == ExpenseSplit.expense_id)
