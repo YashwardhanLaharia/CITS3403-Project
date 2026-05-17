@@ -252,6 +252,7 @@ def group_dashboard(group_id):
     return render_template(
         'dashboard.html',
         group=group,
+        membership=membership,
         members=members,
         expenses=expenses,
         categories=categories,
@@ -399,6 +400,24 @@ def join_group():
     db.session.commit()
 
     flash(f'You have joined "{group.name}" successfully!', 'success')
+    return redirect(url_for('main.index'))
+
+
+@main_bp.route('/groups/<int:group_id>/leave', methods=['POST'])
+@login_required
+def leave_group(group_id):
+    membership = Membership.query.filter_by(
+        group_id=group_id, user_id=current_user.id
+    ).first_or_404()
+
+    if membership.role == 'admin':
+        flash('Admins cannot leave their own group. Transfer ownership or delete the group instead.', 'error')
+        return redirect(url_for('main.group_dashboard', group_id=group_id))
+
+    db.session.delete(membership)
+    db.session.commit()
+
+    flash('You have left the group.', 'success')
     return redirect(url_for('main.index'))
 
 
