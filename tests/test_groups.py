@@ -58,3 +58,95 @@ def test_join_group_creates_membership(client, user_factory, group_factory, logi
     membership = Membership.query.filter_by(group_id=group.id, user_id=member.id).first()
     assert membership is not None
     assert membership.role == 'member'
+
+
+def test_group_dashboard_requires_login(client, user_factory, group_factory):
+    admin, _ = user_factory(email='admin-group@example.com')
+    group = group_factory(creator=admin)
+
+    response = client.get(f'/groups/{group.id}', follow_redirects=False)
+    assert response.status_code == 302
+    assert '/login' in response.headers['Location']
+
+
+def test_group_dashboard_returns_404_for_non_member(client, user_factory, group_factory, login_user):
+    admin, _ = user_factory(email='admin-nonmember@example.com')
+    group = group_factory(creator=admin)
+    other_user, other_password = user_factory(email='other@example.com')
+    login_user(other_user.email, other_password)
+
+    response = client.get(f'/groups/{group.id}')
+    assert response.status_code == 404
+
+
+def test_group_dashboard_accessible_for_member(client, user_factory, group_factory, login_user):
+    admin, password = user_factory(email='admin-access@example.com')
+    group = group_factory(creator=admin)
+    login_user(admin.email, password)
+
+    response = client.get(f'/groups/{group.id}')
+    assert response.status_code == 200
+    assert group.name.encode() in response.data
+
+
+def test_group_data_api_returns_json(client, user_factory, group_factory, login_user):
+    admin, password = user_factory(email='admin-api@example.com')
+    group = group_factory(creator=admin)
+    login_user(admin.email, password)
+
+    response = client.get(f'/groups/{group.id}/data')
+    assert response.status_code == 200
+    assert response.content_type == 'application/json'
+
+    import json
+    data = json.loads(response.data)
+    assert 'group' in data
+    assert data['group']['name'] == group.name
+
+
+def test_group_data_api_requires_login(client, user_factory, group_factory):
+    admin, _ = user_factory(email='admin-api-login@example.com')
+    group = group_factory(creator=admin)
+
+    response = client.get(f'/groups/{group.id}/data')
+    assert response.status_code == 302
+
+
+def test_group_data_api_returns_404_for_non_member(client, user_factory, group_factory, login_user):
+    admin, _ = user_factory(email='admin-apifail@example.com')
+    group = group_factory(creator=admin)
+    other_user, other_password = user_factory(email='other2@example.com')
+    login_user(other_user.email, other_password)
+
+    response = client.get(f'/groups/{group.id}/data')
+    assert response.status_code == 404
+
+
+def test_join_group_already_member_fails(client, user_factory, group_factory, login_user):
+    admin, _ = user_factory(email='admin-member@example.com')
+    group = group_factory(creator=admin)
+    member, password = user_factory(email='member-already@example.com')
+    login_user(member.email, password)
+
+    client.post(
+        '/groups/join',
+        data={'invite_code': group.invite_code},
+        follow_redirects=True,
+    )
+
+    response = client.post(
+        '/groups/join',
+        data={'invite_code': group.invite_code},
+        follow_redirects=True,
+    )
+
+    assert b'already a member' in response.data
+
+
+def test_join_group_requires_login(client):
+    response = client.post(
+        '/groups/join',
+        data={'invite_code': 'ANYPASS'},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
