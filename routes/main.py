@@ -244,7 +244,7 @@ def group_dashboard(group_id):
     ).first_or_404()
 
     group = membership.group
-    members_by_id = {m.user_id: m.user for m in Membership.query.filter_by(group_id=group_id).all()}
+    members_by_id = {m.user_id: m.user for m in Membership.query.filter_by(group_id=group_id).all() if m.user.status == 'active'}
     expenses = Expense.query.filter_by(group_id=group_id).order_by(Expense.date.desc()).all()
 
     members, categories, transfers, total_spent = _compute_group_data(members_by_id, expenses)
@@ -269,7 +269,7 @@ def group_data(group_id):
     ).first_or_404()
 
     group = Group.query.get_or_404(group_id)
-    members_by_id = {m.user_id: m.user for m in Membership.query.filter_by(group_id=group_id).all()}
+    members_by_id = {m.user_id: m.user for m in Membership.query.filter_by(group_id=group_id).all() if m.user.status == 'active'}
     expenses = Expense.query.filter_by(group_id=group_id).order_by(Expense.date.desc()).all()
 
     members, categories, transfers, total_spent = _compute_group_data(members_by_id, expenses)
@@ -502,7 +502,7 @@ def add_expense(group_id):
 
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
-    members = Membership.query.filter_by(group_id=group_id).all()
+    members = [m for m in Membership.query.filter_by(group_id=group_id).all() if m.user.status == 'active']
 
     split_amounts = {}
     if split_type == 'custom' and amount is not None:
