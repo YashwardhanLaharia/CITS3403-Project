@@ -12,16 +12,45 @@ Run:
     pytest tests/test_selenium.py -v
 """
 
+import threading
+import time
 import pytest
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from app import create_app
+from extensions import db as _db
 
 
 # ---------------------------------------------------------------------------
-# Fixtures (TODO)
+# Fixtures
 # ---------------------------------------------------------------------------
-# - live_app: create_app('testing'), init db, run on a free port via
-#   threading.Thread, yield base_url, teardown
-# - driver: headless Chrome via webdriver.Chrome, quit after test
-# - registered_user: sign up a user through the UI, return credentials
+
+@pytest.fixture(scope='module')
+def live_app():
+    app = create_app('testing')
+    with app.app_context():
+        _db.create_all()
+        thread = threading.Thread(
+            target=lambda: app.run(port=5001, use_reloader=False)
+        )
+        thread.daemon = True
+        thread.start()
+        time.sleep(1)
+        yield 'http://localhost:5001'
+        _db.drop_all()
+
+@pytest.fixture(scope='function')
+def driver():
+    options = webdriver.ChromeOptions()
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    d = webdriver.Chrome(options=options)
+    d.implicitly_wait(5)
+    yield d
+    d.quit()
 
 
 # ---------------------------------------------------------------------------
@@ -31,9 +60,18 @@ import pytest
 class TestSignup:
     """Registration form validation and success."""
 
-    def test_signup_with_valid_details(self):
+    def test_signup_with_valid_details(self, live_app, driver):
         """Fill out all fields, submit, verify redirect to home page."""
-        pytest.skip("not implemented")
+        driver.get(live_app + '/signup')
+        driver.find_element(By.NAME, 'first_name').send_keys('Test')
+        driver.find_element(By.NAME, 'last_name').send_keys('User')
+        driver.find_element(By.NAME, 'email').send_keys('testuser@example.com')
+        driver.find_element(By.NAME, 'password').send_keys('Password123!')
+        driver.find_element(By.NAME, 'confirm_password').send_keys('Password123!')
+        driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Welcome back')
+        )
 
     def test_signup_duplicate_email(self):
         """Register twice with the same email, verify error message shows."""
