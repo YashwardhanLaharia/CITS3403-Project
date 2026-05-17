@@ -346,12 +346,52 @@ def test_settle_selective_splits(client, user_factory, group_factory, login_user
     )
 
     db.session.expire_all()
-
     split1_refresh = ExpenseSplit.query.get(split1.id)
     split2_refresh = ExpenseSplit.query.get(split2.id)
-
     assert split1_refresh.is_paid is True
     assert split2_refresh.is_paid is False
+
+
+def test_settle_rejects_non_debtor(client, user_factory, group_factory, login_user):
+    debtor, _ = user_factory(email='debtor-auth@example.com')
+    creditor, _ = user_factory(email='creditor-auth@example.com')
+    other_user, other_password = user_factory(email='other-auth@example.com')
+    admin, _ = user_factory(email='admin-auth@example.com')
+
+    group = group_factory(creator=admin)
+    db.session.add(Membership(user_id=debtor.id, group_id=group.id, role='member'))
+    db.session.add(Membership(user_id=creditor.id, group_id=group.id, role='member'))
+    db.session.add(Membership(user_id=other_user.id, group_id=group.id, role='member'))
+    db.session.commit()
+
+    expense = Expense(
+        group_id=group.id,
+        paid_by=creditor.id,
+        description='Dinner',
+        amount=50.00,
+        category='Food',
+        split_type='equal',
+        date=date(2025, 1, 1),
+    )
+    db.session.add(expense)
+    db.session.flush()
+
+    split = ExpenseSplit(expense_id=expense.id, user_id=debtor.id, share_amount=25.00)
+    db.session.add(split)
+    db.session.commit()
+
+    login_user(other_user.email, other_password)
+
+    response = client.post(
+        f'/groups/{group.id}/settle',
+        data={
+            'debtor_id': debtor.id,
+            'creditor_id': creditor.id,
+        },
+        follow_redirects=True,
+    )
+
+    assert b'You can only settle your own debts' in response.data
 
 
 def test_settle_cross_debts_nets_correctly(client, user_factory, group_factory, login_user):
