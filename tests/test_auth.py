@@ -164,9 +164,8 @@ def test_login_remember_me_option(client, user_factory):
         data={'email': user.email, 'password': password, 'remember': 'on'},
         follow_redirects=True,
     )
-    assert 'Set-Cookie' in response.headers
-    session_cookie = response.headers.get('Set-Cookie', '')
-    assert 'session' in session_cookie.lower()
+    set_cookie = response.headers.get('Set-Cookie', '')
+    assert 'remember' in set_cookie.lower() or 'permanent' in set_cookie.lower()
 
 
 def test_profile_page_requires_login(client):

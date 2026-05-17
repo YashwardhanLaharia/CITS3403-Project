@@ -114,3 +114,11 @@ def test_group_with_three_members_complex_settlement(client, user_factory, group
     assert response.status_code == 200
     expenses = Expense.query.filter_by(group_id=group.id).all()
     assert len(expenses) == 2
+
+    total = sum(float(e.amount) for e in expenses)
+    assert total == 150.00
+
+    import json
+    data_response = client.get(f'/groups/{group.id}/data')
+    data = json.loads(data_response.data)
+    assert data['group']['total_spent'] == 150.00
