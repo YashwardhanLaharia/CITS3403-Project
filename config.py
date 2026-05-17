@@ -4,7 +4,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-fallback-key'
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-fallback-key'  # fallback only for dev; production enforces env var via app.py
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 

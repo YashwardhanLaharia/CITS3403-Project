@@ -4,7 +4,7 @@ from flask_migrate import Migrate
 from flask_wtf import CSRFProtect
 from dotenv import load_dotenv
 from config import config
-from extensions import db, login_manager
+from extensions import db, login_manager, limiter
 
 load_dotenv()
 
@@ -20,10 +20,14 @@ def create_app(config_name=None):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
 
+    if config_name == 'production' and not os.environ.get('SECRET_KEY'):
+        raise ValueError("SECRET_KEY environment variable must be set in production")
+
     db.init_app(app)
     migrate.init_app(app, db)
     csrf.init_app(app)
     login_manager.init_app(app)
+    limiter.init_app(app)
 
     from routes.main import main_bp
     app.register_blueprint(main_bp)
