@@ -1,6 +1,6 @@
 import re
 import secrets
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
 from flask_login import login_required, current_user, logout_user
 from sqlalchemy import func
@@ -396,7 +396,7 @@ def delete_account():
         return redirect(url_for('main.profile'))
 
     current_user.status = 'deleted'
-    current_user.deleted_at = datetime.utcnow()
+    current_user.deleted_at = datetime.now(timezone.utc)
     current_user.email = None
     current_user.set_password(secrets.token_hex(32))
     db.session.commit()
