@@ -138,7 +138,8 @@
                     data-description="{{ e.description }}"
                     data-amount="{{ e.amount }}"
                     data-category="{{ e.category }}"
-                    data-date="{{ e.date.strftime('%Y-%m-%d') }}">
+                    data-date="{{ e.date.strftime('%Y-%m-%d') }}"
+                    data-settled="{{ 'true' if e.splits|selectattr('is_paid', 'equalto', true)|list or e.splits|selectattr('paid_amount', 'greaterthan', 0)|list else 'false' }}">
               <i class="bi bi-pencil"></i> Edit
             </button>
             <form method="POST"

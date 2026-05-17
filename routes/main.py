@@ -647,6 +647,11 @@ def edit_expense(group_id, expense_id):
 
     expense = Expense.query.filter_by(id=expense_id, group_id=group_id).first_or_404()
 
+    # Lock amount editing if any split has been (partially or fully) settled.
+    # Changing the amount after payment would silently recontextualize already-paid
+    # money against a different debt total, causing balances to be wrong.
+    is_settled = any(s.paid_amount > 0 or s.is_paid for s in expense.splits)
+
     description = request.form.get('description', '').strip()
     amount_str = request.form.get('amount', '').strip()
     category = request.form.get('category', '').strip()
@@ -666,16 +671,17 @@ def edit_expense(group_id, expense_id):
         except ValueError:
             errors.append('Invalid date format.')
 
-    amount = None
-    if not amount_str:
-        errors.append('Amount is required.')
-    else:
-        try:
-            amount = float(amount_str)
-            if amount <= 0:
-                errors.append('Amount must be a positive number.')
-        except ValueError:
-            errors.append('Amount must be a valid number.')
+    amount = expense.amount  # default: keep existing amount
+    if not is_settled:
+        if not amount_str:
+            errors.append('Amount is required.')
+        else:
+            try:
+                amount = float(amount_str)
+                if amount <= 0:
+                    errors.append('Amount must be a positive number.')
+            except ValueError:
+                errors.append('Amount must be a valid number.')
 
     if errors:
         for e in errors:
@@ -687,7 +693,7 @@ def edit_expense(group_id, expense_id):
     expense.category = category
     expense.date = expense_date
 
-    if expense.split_type == 'equal':
+    if not is_settled and expense.split_type == 'equal':
         members = [m for m in Membership.query.filter_by(group_id=group_id).all() if m.user.status == 'active']
         share = round(amount / len(members), 2)
         for split in expense.splits:
