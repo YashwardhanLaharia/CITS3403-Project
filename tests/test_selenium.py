@@ -153,10 +153,38 @@ class TestLogin:
 class TestGroups:
     """Creating, joining, and viewing groups."""
 
-    def test_create_group(self):
+    def test_create_group(self, live_app, driver):
         """Open create group modal, fill name + currency, submit,
         verify group appears on home page."""
-        pytest.skip("not implemented")
+        from models import User
+        app = create_app('testing')
+        with app.app_context():
+            user = User(
+                email='grouptest@example.com',
+                first_name='Group',
+                last_name='Test'
+            )
+            user.set_password('Password123!')
+            _db.session.add(user)
+            _db.session.commit()
+
+        driver.get(live_app + '/login')
+        driver.find_element(By.NAME, 'email').send_keys('grouptest@example.com')
+        driver.find_element(By.NAME, 'password').send_keys('Password123!')
+        driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Welcome back')
+        )
+        driver.find_element(By.CSS_SELECTOR, '[data-bs-target="#createGroupModal"]').click()
+        WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.ID, 'createGroupModal'))
+        )
+        driver.find_element(By.NAME, 'group_name').send_keys('Sydney Trip')
+        driver.find_element(By.NAME, 'currency').send_keys('AUD')
+        driver.find_element(By.CSS_SELECTOR, '#createGroupModal button[type="submit"]').click()
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Sydney Trip')
+        )
 
     def test_join_group_valid_code(self):
         """Enter a valid invite code, submit, verify membership."""
