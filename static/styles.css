@@ -134,20 +134,6 @@
       z-index: 90;
     }
 
-    .search-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 8px 14px;
-      width: 220px;
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      cursor: text;
-    }
-
     .topnav-icons {
       display: flex;
       align-items: center;
@@ -1760,11 +1746,6 @@
   /* Typography — scale down section titles on mobile */
   .section-title {
     font-size: 0.9rem;
-  }
-
-  /* Topnav — hide search bar on mobile to save space */
-  .search-bar {
-    display: none;
   }
 
   /* Force single column for expense distribution and activity grids */
