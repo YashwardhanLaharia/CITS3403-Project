@@ -293,17 +293,19 @@ def test_compute_group_data_three_member_settlement(app, user_factory):
 
 
 def test_settle_selective_splits(client, user_factory, group_factory, login_user):
-    debtor, _ = user_factory(email='debtor-sel@example.com')
+    # Paying exactly split1's amount ($25) should cover split1 but leave split2 ($15)
+    # untouched, because the greedy loop marks splits smallest-first and $25 < $25+$15.
+    debtor, debtor_password = user_factory(email='debtor-sel@example.com')
     creditor, _ = user_factory(email='creditor-sel@example.com')
 
-    admin, password = user_factory(email='admin-sel@example.com')
+    admin, _ = user_factory(email='admin-sel@example.com')
     group = group_factory(creator=admin)
 
     db.session.add(Membership(user_id=debtor.id, group_id=group.id, role='member'))
     db.session.add(Membership(user_id=creditor.id, group_id=group.id, role='member'))
     db.session.commit()
 
-    login_user(debtor.email, password)
+    login_user(debtor.email, debtor_password)
 
     expense1 = Expense(
         group_id=group.id,
@@ -335,12 +337,18 @@ def test_settle_selective_splits(client, user_factory, group_factory, login_user
     db.session.add(split2)
     db.session.commit()
 
+    # Pay exactly split1's share — greedy covers $15 first, then $25, so both are
+    # cleared when paying the full $25. To isolate split1 only we pay exactly $25
+    # which covers the $15 split AND the $25 split (total $40 > $25), so only the
+    # $15 split (smallest first) is covered — leaving $10 remainder which doesn't
+    # cover the $25 split.
+    # Simpler: pay only $15 so that only the $15 split is covered.
     client.post(
         f'/groups/{group.id}/settle',
         data={
             'debtor_id': debtor.id,
             'creditor_id': creditor.id,
-            'split_ids': str(split1.id),
+            'payment_amount': '15.00',
         },
         follow_redirects=True,
     )
@@ -348,8 +356,9 @@ def test_settle_selective_splits(client, user_factory, group_factory, login_user
     db.session.expire_all()
     split1_refresh = ExpenseSplit.query.get(split1.id)
     split2_refresh = ExpenseSplit.query.get(split2.id)
-    assert split1_refresh.is_paid is True
-    assert split2_refresh.is_paid is False
+    # Greedy smallest-first: $15 split is cleared by $15 payment; $25 split remains
+    assert split1_refresh.is_paid is False
+    assert split2_refresh.is_paid is True
 
 
 def test_settle_rejects_non_debtor(client, user_factory, group_factory, login_user):
@@ -387,6 +396,7 @@ def test_settle_rejects_non_debtor(client, user_factory, group_factory, login_us
         data={
             'debtor_id': debtor.id,
             'creditor_id': creditor.id,
+            'payment_amount': '25.00',
         },
         follow_redirects=True,
     )
@@ -438,7 +448,7 @@ def test_settle_cross_debts_nets_correctly(client, user_factory, group_factory, 
 
     client.post(
         f'/groups/{group.id}/settle',
-        data={'debtor_id': bob.id, 'creditor_id': alice.id, 'split_ids': ''},
+        data={'debtor_id': bob.id, 'creditor_id': alice.id, 'payment_amount': '40.00'},
         follow_redirects=True,
     )
 
@@ -497,7 +507,7 @@ def test_settle_partial_cross_debt(client, user_factory, group_factory, login_us
         data={
             'debtor_id': bob.id,
             'creditor_id': alice.id,
-            'split_ids': '',
+            'payment_amount': '50.00',
         },
         follow_redirects=True,
     )
@@ -547,7 +557,7 @@ def test_settle_reciprocal_larger_than_net(client, user_factory, group_factory, 
 
     client.post(
         f'/groups/{group.id}/settle',
-        data={'debtor_id': bob.id, 'creditor_id': alice.id, 'split_ids': ''},
+        data={'debtor_id': bob.id, 'creditor_id': alice.id, 'payment_amount': '10.00'},
         follow_redirects=True,
     )
 
@@ -555,3 +565,85 @@ def test_settle_reciprocal_larger_than_net(client, user_factory, group_factory, 
 
     assert ExpenseSplit.query.get(bob_owes_alice.id).is_paid is True   # $10 fully covered by cash_due
     assert ExpenseSplit.query.get(alice_owes_bob.id).is_paid is False  # $50 > debtor_total $10, not marked
+
+
+def test_settle_partial_amount(client, user_factory, group_factory, login_user):
+    # Bob owes Alice $10 + $30 = $40 total, no cross-debts.
+    # Bob pays $15 — greedy smallest-first covers the $10 split (cash_due $5 left),
+    # but $5 < $30 so the large split stays unpaid.
+    alice, _ = user_factory(email='alice-pamt@example.com')
+    bob, bob_password = user_factory(email='bob-pamt@example.com')
+
+    admin, _ = user_factory(email='admin-pamt@example.com')
+    group = group_factory(creator=admin)
+
+    db.session.add(Membership(user_id=alice.id, group_id=group.id, role='member'))
+    db.session.add(Membership(user_id=bob.id, group_id=group.id, role='member'))
+    db.session.commit()
+
+    expense1 = Expense(
+        group_id=group.id, paid_by=alice.id, description='Dinner',
+        amount=20.00, category='Food', split_type='equal', date=date(2025, 1, 1),
+    )
+    db.session.add(expense1)
+    expense2 = Expense(
+        group_id=group.id, paid_by=alice.id, description='Hotel',
+        amount=60.00, category='Accommodation', split_type='equal', date=date(2025, 1, 2),
+    )
+    db.session.add(expense2)
+    db.session.flush()
+
+    split_small = ExpenseSplit(expense_id=expense1.id, user_id=bob.id, share_amount=10.00)
+    split_large = ExpenseSplit(expense_id=expense2.id, user_id=bob.id, share_amount=30.00)
+    db.session.add(split_small)
+    db.session.add(split_large)
+    db.session.commit()
+
+    login_user(bob.email, bob_password)
+
+    client.post(
+        f'/groups/{group.id}/settle',
+        data={'debtor_id': bob.id, 'creditor_id': alice.id, 'payment_amount': '15.00'},
+        follow_redirects=True,
+    )
+
+    db.session.expire_all()
+
+    # $10 split covered by $15 payment; $5 remainder < $30, so large split stays unpaid
+    assert ExpenseSplit.query.get(split_small.id).is_paid is True
+    assert ExpenseSplit.query.get(split_large.id).is_paid is False
+
+
+def test_settle_rejects_amount_exceeding_balance(client, user_factory, group_factory, login_user):
+    alice, _ = user_factory(email='alice-exceed@example.com')
+    bob, bob_password = user_factory(email='bob-exceed@example.com')
+
+    admin, _ = user_factory(email='admin-exceed@example.com')
+    group = group_factory(creator=admin)
+
+    db.session.add(Membership(user_id=alice.id, group_id=group.id, role='member'))
+    db.session.add(Membership(user_id=bob.id, group_id=group.id, role='member'))
+    db.session.commit()
+
+    expense = Expense(
+        group_id=group.id, paid_by=alice.id, description='Groceries',
+        amount=40.00, category='Food', split_type='equal', date=date(2025, 1, 1),
+    )
+    db.session.add(expense)
+    db.session.flush()
+
+    split = ExpenseSplit(expense_id=expense.id, user_id=bob.id, share_amount=20.00)
+    db.session.add(split)
+    db.session.commit()
+
+    login_user(bob.email, bob_password)
+
+    response = client.post(
+        f'/groups/{group.id}/settle',
+        data={'debtor_id': bob.id, 'creditor_id': alice.id, 'payment_amount': '999.00'},
+        follow_redirects=True,
+    )
+
+    assert b'Payment amount exceeds outstanding balance' in response.data
+    db.session.expire_all()
+    assert ExpenseSplit.query.get(split.id).is_paid is False
