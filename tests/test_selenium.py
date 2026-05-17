@@ -2,7 +2,7 @@
 Selenium end-to-end tests for SplitMate.
 
 Uses a live Flask test server + Chrome WebDriver to exercise real
-user flows through the browser. Each test gets a fresh database.
+user flows through the browser.
 
 Prerequisites:
     pip install selenium
@@ -14,6 +14,7 @@ Run:
 
 import threading
 import time
+import urllib.request
 import pytest
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -21,6 +22,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from app import create_app
 from extensions import db as _db
+from models import User, Group, Membership
+
+
+BASE_URL = 'http://localhost:5001'
 
 
 # ---------------------------------------------------------------------------
@@ -28,18 +33,42 @@ from extensions import db as _db
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope='module')
-def live_app():
-    app = create_app('testing')
-    with app.app_context():
+def app():
+    """Create the Flask app and start a live server in a background thread."""
+    application = create_app('testing')
+    with application.app_context():
         _db.create_all()
-        thread = threading.Thread(
-            target=lambda: app.run(port=5001, use_reloader=False)
-        )
-        thread.daemon = True
-        thread.start()
-        time.sleep(1)
-        yield 'http://localhost:5001'
+
+    thread = threading.Thread(
+        target=lambda: application.run(port=5001, use_reloader=False)
+    )
+    thread.daemon = True
+    thread.start()
+
+    # Wait for server to be ready instead of a fixed sleep
+    for _ in range(20):
+        try:
+            urllib.request.urlopen(BASE_URL + '/login')
+            break
+        except Exception:
+            time.sleep(0.25)
+
+    yield application
+
+    with application.app_context():
         _db.drop_all()
+
+
+@pytest.fixture(autouse=True)
+def clean_db(app):
+    """Wipe all table data between tests for isolation."""
+    yield
+    with app.app_context():
+        meta = _db.metadata
+        for table in reversed(meta.sorted_tables):
+            _db.session.execute(table.delete())
+        _db.session.commit()
+
 
 @pytest.fixture(scope='function')
 def driver():
@@ -60,9 +89,9 @@ def driver():
 class TestSignup:
     """Registration form validation and success."""
 
-    def test_signup_with_valid_details(self, live_app, driver):
+    def test_signup_with_valid_details(self, app, driver):
         """Fill out all fields, submit, verify redirect to home page."""
-        driver.get(live_app + '/signup')
+        driver.get(BASE_URL + '/signup')
         driver.find_element(By.NAME, 'first_name').send_keys('Test')
         driver.find_element(By.NAME, 'last_name').send_keys('User')
         driver.find_element(By.NAME, 'email').send_keys('testuser@example.com')
@@ -89,10 +118,8 @@ class TestSignup:
 class TestLogin:
     """Login, logout, and protected page redirects."""
 
-    def test_login_valid_credentials(self, live_app, driver):
+    def test_login_valid_credentials(self, app, driver):
         """Log in with a registered user, verify we land on the home page."""
-        from models import User
-        app = create_app('testing')
         with app.app_context():
             user = User(
                 email='logintest@example.com',
@@ -103,7 +130,7 @@ class TestLogin:
             _db.session.add(user)
             _db.session.commit()
 
-        driver.get(live_app + '/login')
+        driver.get(BASE_URL + '/login')
         driver.find_element(By.NAME, 'email').send_keys('logintest@example.com')
         driver.find_element(By.NAME, 'password').send_keys('Password123!')
         driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
@@ -119,10 +146,8 @@ class TestLogin:
         """Hitting /profile without auth redirects to /login."""
         pytest.skip("not implemented")
 
-    def test_logout(self, live_app, driver):
+    def test_logout(self, app, driver):
         """Log out via sidebar, verify redirect to login page."""
-        from models import User
-        app = create_app('testing')
         with app.app_context():
             user = User(
                 email='logouttest@example.com',
@@ -133,7 +158,7 @@ class TestLogin:
             _db.session.add(user)
             _db.session.commit()
 
-        driver.get(live_app + '/login')
+        driver.get(BASE_URL + '/login')
         driver.find_element(By.NAME, 'email').send_keys('logouttest@example.com')
         driver.find_element(By.NAME, 'password').send_keys('Password123!')
         driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
@@ -153,11 +178,9 @@ class TestLogin:
 class TestGroups:
     """Creating, joining, and viewing groups."""
 
-    def test_create_group(self, live_app, driver):
+    def test_create_group(self, app, driver):
         """Open create group modal, fill name + currency, submit,
         verify group appears on home page."""
-        from models import User
-        app = create_app('testing')
         with app.app_context():
             user = User(
                 email='grouptest@example.com',
@@ -168,7 +191,7 @@ class TestGroups:
             _db.session.add(user)
             _db.session.commit()
 
-        driver.get(live_app + '/login')
+        driver.get(BASE_URL + '/login')
         driver.find_element(By.NAME, 'email').send_keys('grouptest@example.com')
         driver.find_element(By.NAME, 'password').send_keys('Password123!')
         driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
@@ -194,11 +217,9 @@ class TestGroups:
         """Enter a bogus invite code, verify error flash."""
         pytest.skip("not implemented")
 
-    def test_group_dashboard_loads(self, live_app, driver):
+    def test_group_dashboard_loads(self, app, driver):
         """Navigate to a group dashboard, verify key sections render:
         member balances, expense distribution, recent activity, settlement."""
-        from models import User, Group, Membership
-        app = create_app('testing')
         with app.app_context():
             user = User(
                 email='dashtest@example.com',
@@ -225,14 +246,14 @@ class TestGroups:
             _db.session.commit()
             group_id = group.id
 
-        driver.get(live_app + '/login')
+        driver.get(BASE_URL + '/login')
         driver.find_element(By.NAME, 'email').send_keys('dashtest@example.com')
         driver.find_element(By.NAME, 'password').send_keys('Password123!')
         driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
         WebDriverWait(driver, 10).until(
             EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Welcome back')
         )
-        driver.get(live_app + f'/groups/{group_id}')
+        driver.get(BASE_URL + f'/groups/{group_id}')
         WebDriverWait(driver, 10).until(
             EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Member Balances')
         )
