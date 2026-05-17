@@ -14,7 +14,7 @@ def test_add_equal_expense_creates_splits(
 
     login_user(admin.email, password)
 
-    response = client.post(
+    client.post(
         f'/groups/{group.id}/expenses/add',
         data={
             'description': 'Lunch',
@@ -43,7 +43,7 @@ def test_add_custom_splits_respects_amounts(
 
     login_user(admin.email, password)
 
-    response = client.post(
+    client.post(
         f'/groups/{group.id}/expenses/add',
         data={
             'description': 'Dinner',
@@ -59,7 +59,8 @@ def test_add_custom_splits_respects_amounts(
 
     expense = Expense.query.filter_by(description='Dinner').first()
     assert expense is not None
-    custom_splits = {split.user_id: float(split.share_amount) for split in ExpenseSplit.query.filter_by(expense_id=expense.id)}
+    splits_query = ExpenseSplit.query.filter_by(expense_id=expense.id)
+    custom_splits = {split.user_id: float(split.share_amount) for split in splits_query}
     assert custom_splits[admin.id] == 90.0
     assert custom_splits[extra_user.id] == 60.0
 
@@ -75,7 +76,7 @@ def test_custom_split_validation_fails_when_totals_mismatch(
 
     login_user(admin.email, password)
 
-    response = client.post(
+    client.post(
         f'/groups/{group.id}/expenses/add',
         data={
             'description': 'Broken Split',
