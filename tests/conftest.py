@@ -66,7 +66,7 @@ def group_factory(user_factory):
         _db.session.commit()
         return group
 
-    return _create_group
+    yield _create_group
 
 
 @pytest.fixture
