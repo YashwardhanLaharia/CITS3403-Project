@@ -355,6 +355,10 @@ def test_settle_selective_splits(client, user_factory, group_factory, login_user
 
 
 def test_settle_cross_debts_nets_correctly(client, user_factory, group_factory, login_user):
+    # bob owes alice $10 + $30 = $40 total
+    # alice owes bob $25
+    # net cash_due = $40 - $25 = $15
+    # sorted splits: [$10, $30] — $10 is fully covered, $30 is not
     alice, _ = user_factory(email='alice-cross@example.com')
     bob, bob_password = user_factory(email='bob-cross@example.com')
 
@@ -366,54 +370,43 @@ def test_settle_cross_debts_nets_correctly(client, user_factory, group_factory, 
     db.session.commit()
 
     expense1 = Expense(
-        group_id=group.id,
-        paid_by=bob.id,
-        description='Bob paid',
-        amount=80.00,
-        category='Food',
-        split_type='equal',
-        date=date(2025, 1, 1),
+        group_id=group.id, paid_by=bob.id, description='Bob paid',
+        amount=50.00, category='Food', split_type='equal', date=date(2025, 1, 1),
     )
     db.session.add(expense1)
-    db.session.flush()
-
     expense2 = Expense(
-        group_id=group.id,
-        paid_by=alice.id,
-        description='Alice paid',
-        amount=50.00,
-        category='Food',
-        split_type='equal',
-        date=date(2025, 1, 2),
+        group_id=group.id, paid_by=alice.id, description='Alice paid A',
+        amount=20.00, category='Food', split_type='equal', date=date(2025, 1, 2),
     )
     db.session.add(expense2)
+    expense3 = Expense(
+        group_id=group.id, paid_by=alice.id, description='Alice paid B',
+        amount=60.00, category='Food', split_type='equal', date=date(2025, 1, 3),
+    )
+    db.session.add(expense3)
     db.session.flush()
 
-    bob_owes_alice = ExpenseSplit(expense_id=expense2.id, user_id=bob.id, share_amount=40.00)
     alice_owes_bob = ExpenseSplit(expense_id=expense1.id, user_id=alice.id, share_amount=25.00)
-    db.session.add(bob_owes_alice)
+    bob_owes_alice_small = ExpenseSplit(expense_id=expense2.id, user_id=bob.id, share_amount=10.00)
+    bob_owes_alice_large = ExpenseSplit(expense_id=expense3.id, user_id=bob.id, share_amount=30.00)
     db.session.add(alice_owes_bob)
+    db.session.add(bob_owes_alice_small)
+    db.session.add(bob_owes_alice_large)
     db.session.commit()
 
     login_user(bob.email, bob_password)
 
     client.post(
         f'/groups/{group.id}/settle',
-        data={
-            'debtor_id': bob.id,
-            'creditor_id': alice.id,
-            'split_ids': '',
-        },
+        data={'debtor_id': bob.id, 'creditor_id': alice.id, 'split_ids': ''},
         follow_redirects=True,
     )
 
     db.session.expire_all()
 
-    bob_owes_alice_refresh = ExpenseSplit.query.get(bob_owes_alice.id)
-    alice_owes_bob_refresh = ExpenseSplit.query.get(alice_owes_bob.id)
-
-    assert bob_owes_alice_refresh.is_paid is True
-    assert alice_owes_bob_refresh.is_paid is True
+    assert ExpenseSplit.query.get(alice_owes_bob.id).is_paid is True      # reciprocal cleared
+    assert ExpenseSplit.query.get(bob_owes_alice_small.id).is_paid is True  # $10 covered by $15 net
+    assert ExpenseSplit.query.get(bob_owes_alice_large.id).is_paid is False  # $30 not covered by remaining $5
 
 
 def test_settle_partial_cross_debt(client, user_factory, group_factory, login_user):
@@ -474,5 +467,5 @@ def test_settle_partial_cross_debt(client, user_factory, group_factory, login_us
     bob_owes_alice_refresh = ExpenseSplit.query.get(bob_owes_alice.id)
     alice_owes_bob_refresh = ExpenseSplit.query.get(alice_owes_bob.id)
 
-    assert bob_owes_alice_refresh.is_paid is True
-    assert alice_owes_bob_refresh.is_paid is True
+    assert bob_owes_alice_refresh.is_paid is False  # $50 not fully covered by $25 cash remainder
+    assert alice_owes_bob_refresh.is_paid is True   # reciprocal offset applied

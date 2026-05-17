@@ -787,22 +787,20 @@ def settle(group_id):
         return redirect(url_for('main.group_dashboard', group_id=group_id))
 
     debtor_total = sum(float(s.share_amount) for s in splits_to_settle)
-    reciprocal_total = sum(float(s.share_amount) for s in cross_splits_to_settle)
 
     offset_applied = 0.0
-    for split in cross_splits_to_settle:
+    for split in sorted(cross_splits_to_settle, key=lambda s: float(s.share_amount)):
         if offset_applied >= debtor_total:
             break
         split.is_paid = True
         offset_applied += float(split.share_amount)
 
     cash_due = max(debtor_total - offset_applied, 0)
-    if cash_due > 0:
-        for split in splits_to_settle:
-            if cash_due <= 0:
-                break
+    for split in sorted(splits_to_settle, key=lambda s: float(s.share_amount)):
+        split_amount = float(split.share_amount)
+        if cash_due >= split_amount:
             split.is_paid = True
-            cash_due -= float(split.share_amount)
+            cash_due -= split_amount
 
     db.session.commit()
     flash('Settlement marked as paid.', 'success')
