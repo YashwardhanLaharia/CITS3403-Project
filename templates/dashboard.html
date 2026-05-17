@@ -124,9 +124,9 @@
           </div>
           <div>
             <div class="archived-name">{{ e.description }}</div>
-            <div class="archived-meta">
-              ${{ "%.2f"|format(e.amount) }} &middot; {{ e.category }} &middot; {{ e.date.strftime('%d %b %Y') }} &middot; paid by {{ e.payer.first_name }}
-            </div>
+              <div class="archived-meta">
+                ${{ "%.2f"|format(e.amount) }} &middot; {{ e.category }} &middot; {{ e.date.strftime('%d %b %Y') }} &middot; paid by {{ e.payer.display_name }}
+              </div>
           </div>
         </div>
         {% endfor %}

@@ -1,7 +1,8 @@
 import re
+import secrets
 from datetime import datetime, date
 from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
-from flask_login import login_required, current_user
+from flask_login import login_required, current_user, logout_user
 from sqlalchemy import func
 from extensions import db, login_manager, limiter
 from models import User, Group, Membership, Expense, ExpenseSplit
@@ -12,8 +13,8 @@ main_bp = Blueprint('main', __name__)
 @login_manager.user_loader
 def load_user(user_id):
     user = User.query.get(int(user_id))
-    if user is None:
-        login_manager.unauthorized()
+    if user is None or user.status != 'active':
+        return None
     return user
 
 
@@ -97,7 +98,7 @@ def login():
 
         if not errors:
             user = User.query.filter_by(email=email).first()
-            if user and user.check_password(password):
+            if user and user.status == 'active' and user.check_password(password):
                 from flask_login import login_user
                 login_user(user, remember=bool(remember))
                 next_page = request.args.get('next')
@@ -196,7 +197,7 @@ def _compute_group_data(members_by_id, expenses):
     members = [
         {
             'id': uid,
-            'name': f'{user.first_name} {user.last_name}',
+            'name': user.display_name,
             'initials': f'{user.first_name[0]}{user.last_name[0]}'.upper(),
             'paid': paid_totals.get(uid, 0.0),
             'balance': paid_totals.get(uid, 0.0) - share_totals.get(uid, 0.0),
@@ -222,8 +223,8 @@ def _compute_group_data(members_by_id, expenses):
         creditor_id, credit = creditors[j]
         amount = min(debt, credit)
         transfers.append({
-            'from_name': f'{members_by_id[debtor_id].first_name} {members_by_id[debtor_id].last_name}',
-            'to_name': f'{members_by_id[creditor_id].first_name} {members_by_id[creditor_id].last_name}',
+            'from_name': members_by_id[debtor_id].display_name,
+            'to_name': members_by_id[creditor_id].display_name,
             'amount': round(amount, 2),
         })
         debtors[i][1] -= amount
@@ -248,12 +249,14 @@ def group_dashboard(group_id):
     expenses = Expense.query.filter_by(group_id=group_id).order_by(Expense.date.desc()).all()
 
     members, categories, transfers, total_spent = _compute_group_data(members_by_id, expenses)
+    active_members = [m for m in members if members_by_id.get(m['id']).status == 'active']
 
     return render_template(
         'dashboard.html',
         group=group,
         membership=membership,
         members=members,
+        active_members=active_members,
         expenses=expenses,
         categories=categories,
         transfers=transfers,
@@ -305,7 +308,7 @@ def group_data(group_id):
                 'amount': float(e.amount),
                 'category': e.category,
                 'date': e.date.strftime('%Y-%m-%d'),
-                'paid_by': f'{e.payer.first_name} {e.payer.last_name}',
+                'paid_by': e.payer.display_name,
             }
             for e in expenses
         ],
@@ -331,8 +334,6 @@ def group_data(group_id):
 @main_bp.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile():
-    from flask_login import current_user
-
     if request.method == 'POST':
         first_name = request.form.get('first_name', '').strip()
         last_name = request.form.get('last_name', '').strip()
@@ -362,7 +363,6 @@ def profile():
             current_user.last_name = last_name
             if new_password:
                 current_user.set_password(new_password)
-                from flask_login import logout_user
                 db.session.commit()
                 logout_user()
                 flash('Profile updated. Please log in with your new password.', 'success')
@@ -381,6 +381,28 @@ def profile():
                            last_name=current_user.last_name,
                            email=current_user.email,
                            created_at=current_user.created_at)
+
+
+@main_bp.route('/profile/delete', methods=['POST'])
+@login_required
+def delete_account():
+    delete_password = request.form.get('delete_password', '')
+    if not delete_password:
+        flash('Current password is required to delete your account.', 'error')
+        return redirect(url_for('main.profile'))
+
+    if not current_user.check_password(delete_password):
+        flash('The password you entered is incorrect.', 'error')
+        return redirect(url_for('main.profile'))
+
+    current_user.status = 'deleted'
+    current_user.deleted_at = datetime.utcnow()
+    current_user.email = None
+    current_user.set_password(secrets.token_hex(32))
+    db.session.commit()
+    logout_user()
+    flash('Your account was deleted. The data you contributed remains in shared groups.', 'info')
+    return redirect(url_for('main.login'))
 
 
 @main_bp.route('/groups/join', methods=['POST'])
@@ -497,7 +519,7 @@ def add_expense(group_id):
 
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
-    members = Membership.query.filter_by(group_id=group_id).all()
+    members = [m for m in Membership.query.filter_by(group_id=group_id).all() if m.user.status == 'active']
 
     amount = None
     split_amounts = {}
