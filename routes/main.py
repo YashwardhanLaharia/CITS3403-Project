@@ -52,7 +52,11 @@ def index():
     fair_shares = dict(
         db.session.query(Expense.group_id, func.coalesce(func.sum(ExpenseSplit.share_amount), 0))
         .join(ExpenseSplit, ExpenseSplit.expense_id == Expense.id)
-        .filter(Expense.group_id.in_(group_ids), ExpenseSplit.user_id == current_user.id)
+        .filter(
+            Expense.group_id.in_(group_ids),
+            ExpenseSplit.user_id == current_user.id,
+            ExpenseSplit.is_paid == False,
+        )
         .group_by(Expense.group_id)
         .all()
     )
@@ -192,7 +196,9 @@ def _compute_group_data(members_by_id, expenses):
         cat = expense.category or 'Other'
         category_totals[cat] = category_totals.get(cat, 0.0) + amount
         for split in expense.splits:
-            if not split.is_paid:
+            if split.is_paid:
+                paid_totals[expense.paid_by] = paid_totals.get(expense.paid_by, 0.0) - float(split.share_amount)
+            else:
                 share_totals[split.user_id] = share_totals.get(split.user_id, 0.0) + float(split.share_amount)
 
     members = [
