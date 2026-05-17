@@ -6,7 +6,7 @@ from flask import Blueprint, render_template, request, flash, redirect, url_for,
 from flask_login import login_required, current_user, logout_user
 from sqlalchemy import func
 from extensions import db, login_manager, limiter
-from models import User, Group, Membership, Expense, ExpenseSplit
+from models import User, Group, Membership, Expense, ExpenseSplit, Payment
 
 main_bp = Blueprint('main', __name__)
 
@@ -56,21 +56,22 @@ def index():
         .filter(
             Expense.group_id.in_(group_ids),
             ExpenseSplit.user_id == current_user.id,
-            ExpenseSplit.is_paid == False,
         )
         .group_by(Expense.group_id)
         .all()
     )
 
-    settled = dict(
-        db.session.query(Expense.group_id, func.coalesce(func.sum(ExpenseSplit.share_amount), 0))
-        .join(ExpenseSplit, ExpenseSplit.expense_id == Expense.id)
-        .filter(
-            Expense.group_id.in_(group_ids),
-            Expense.paid_by == current_user.id,
-            ExpenseSplit.is_paid == True,
-        )
-        .group_by(Expense.group_id)
+    payments_made = dict(
+        db.session.query(Payment.group_id, func.coalesce(func.sum(Payment.amount), 0))
+        .filter(Payment.payer_id == current_user.id, Payment.group_id.in_(group_ids))
+        .group_by(Payment.group_id)
+        .all()
+    )
+
+    payments_received = dict(
+        db.session.query(Payment.group_id, func.coalesce(func.sum(Payment.amount), 0))
+        .filter(Payment.payee_id == current_user.id, Payment.group_id.in_(group_ids))
+        .group_by(Payment.group_id)
         .all()
     )
 
@@ -79,8 +80,10 @@ def index():
 
     for gid in group_ids:
         group = groups_by_id[gid]
-        effective_paid = float(paid_by_user.get(gid, 0)) - float(settled.get(gid, 0))
-        user_balance = effective_paid - float(fair_shares.get(gid, 0))
+        user_balance = (
+            (float(paid_by_user.get(gid, 0)) - float(payments_received.get(gid, 0)))
+            - (float(fair_shares.get(gid, 0)) - float(payments_made.get(gid, 0)))
+        )
         net_balance += user_balance
 
         groups.append({
@@ -193,7 +196,7 @@ def logout():
     return redirect(url_for('main.login'))
 
 
-def _compute_group_data(members_by_id, expenses):
+def _compute_group_data(members_by_id, expenses, group_id):
     """Compute per-member balances, category distribution, and settlement transfers.
 
     Returns (members, categories, transfers, total_spent).
@@ -213,10 +216,11 @@ def _compute_group_data(members_by_id, expenses):
         cat = expense.category or 'Other'
         category_totals[cat] = category_totals.get(cat, 0.0) + amount
         for split in expense.splits:
-            if split.is_paid:
-                paid_totals[expense.paid_by] = paid_totals.get(expense.paid_by, 0.0) - float(split.share_amount)
-            else:
-                share_totals[split.user_id] = share_totals.get(split.user_id, 0.0) + float(split.share_amount)
+            share_totals[split.user_id] = share_totals.get(split.user_id, 0.0) + float(split.share_amount)
+
+    for p in Payment.query.filter_by(group_id=group_id).all():
+        share_totals[p.payer_id] = share_totals.get(p.payer_id, 0.0) - float(p.amount)
+        paid_totals[p.payee_id] = paid_totals.get(p.payee_id, 0.0) - float(p.amount)
 
     members = [
         {
@@ -274,7 +278,7 @@ def group_dashboard(group_id):
     members_by_id = {m.user_id: m.user for m in Membership.query.filter_by(group_id=group_id).all()}
     expenses = Expense.query.filter_by(group_id=group_id).order_by(Expense.date.desc()).all()
 
-    members, categories, transfers, total_spent = _compute_group_data(members_by_id, expenses)
+    members, categories, transfers, total_spent = _compute_group_data(members_by_id, expenses, group_id)
     active_members = [m for m in members if members_by_id.get(m['id']).status == 'active']
 
     return render_template(
@@ -308,7 +312,7 @@ def group_data(group_id):
     members_by_id = {m.user_id: m.user for m in Membership.query.filter_by(group_id=group_id).all()}
     expenses = Expense.query.filter_by(group_id=group_id).order_by(Expense.date.desc()).all()
 
-    members, categories, transfers, total_spent = _compute_group_data(members_by_id, expenses)
+    members, categories, transfers, total_spent = _compute_group_data(members_by_id, expenses, group_id)
 
     return jsonify({
         'group': {
@@ -725,42 +729,49 @@ def settle(group_id):
         group_id=group_id, user_id=creditor_id
     ).first_or_404()
 
-    splits = (
-        ExpenseSplit.query
+    total_owed = float(
+        db.session.query(func.coalesce(func.sum(ExpenseSplit.share_amount), 0))
         .join(Expense, Expense.id == ExpenseSplit.expense_id)
         .filter(
             ExpenseSplit.user_id == debtor_id,
-            ExpenseSplit.is_paid == False,
             Expense.paid_by == creditor_id,
             Expense.group_id == group_id,
         )
-        .all()
+        .scalar()
     )
 
-    cross_splits = (
-        ExpenseSplit.query
-        .join(Expense, Expense.id == ExpenseSplit.expense_id)
+    total_paid_already = float(
+        db.session.query(func.coalesce(func.sum(Payment.amount), 0))
         .filter(
-            ExpenseSplit.user_id == creditor_id,
-            ExpenseSplit.is_paid == False,
-            Expense.paid_by == debtor_id,
-            Expense.group_id == group_id,
+            Payment.payer_id == debtor_id,
+            Payment.payee_id == creditor_id,
+            Payment.group_id == group_id,
         )
-        .all()
+        .scalar()
     )
 
-    if not splits and not cross_splits:
-        flash('No outstanding splits found.', 'error')
+    net_owed = round(total_owed - total_paid_already, 2)
+
+    if net_owed <= 0:
+        flash('No outstanding balance.', 'error')
         return redirect(url_for('main.group_dashboard', group_id=group_id))
 
-    for split in splits:
-        split.is_paid = True
+    payment_amount = request.form.get('payment_amount', type=float)
+    if payment_amount is None:
+        payment_amount = net_owed
 
-    for split in cross_splits:
-        split.is_paid = True
+    if payment_amount > net_owed:
+        flash('Payment exceeds outstanding balance.', 'error')
+        return redirect(url_for('main.group_dashboard', group_id=group_id))
 
+    db.session.add(Payment(
+        payer_id=debtor_id,
+        payee_id=creditor_id,
+        group_id=group_id,
+        amount=payment_amount,
+    ))
     db.session.commit()
-    flash('Settlement marked as paid.', 'success')
+    flash(f'Payment of ${payment_amount:.2f} recorded.', 'success')
     return redirect(url_for('main.group_dashboard', group_id=group_id))
 
 
