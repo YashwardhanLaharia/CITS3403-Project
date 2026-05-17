@@ -194,10 +194,50 @@ class TestGroups:
         """Enter a bogus invite code, verify error flash."""
         pytest.skip("not implemented")
 
-    def test_group_dashboard_loads(self):
+    def test_group_dashboard_loads(self, live_app, driver):
         """Navigate to a group dashboard, verify key sections render:
         member balances, expense distribution, recent activity, settlement."""
-        pytest.skip("not implemented")
+        from models import User, Group, Membership
+        app = create_app('testing')
+        with app.app_context():
+            user = User(
+                email='dashtest@example.com',
+                first_name='Dash',
+                last_name='Test'
+            )
+            user.set_password('Password123!')
+            _db.session.add(user)
+            _db.session.flush()
+            group = Group(
+                name='Dashboard Group',
+                currency='AUD',
+                invite_code=Group.generate_invite_code(),
+                created_by=user.id
+            )
+            _db.session.add(group)
+            _db.session.flush()
+            membership = Membership(
+                user_id=user.id,
+                group_id=group.id,
+                role='admin'
+            )
+            _db.session.add(membership)
+            _db.session.commit()
+            group_id = group.id
+
+        driver.get(live_app + '/login')
+        driver.find_element(By.NAME, 'email').send_keys('dashtest@example.com')
+        driver.find_element(By.NAME, 'password').send_keys('Password123!')
+        driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Welcome back')
+        )
+        driver.get(live_app + f'/groups/{group_id}')
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Member Balances')
+        )
+        assert 'Recent Activity' in driver.find_element(By.TAG_NAME, 'body').text
+        assert 'Settlement Preview' in driver.find_element(By.TAG_NAME, 'body').text
 
 
 # ---------------------------------------------------------------------------
