@@ -1368,6 +1368,10 @@
       gap: 10px;
     }
 
+    .modal-content .btn-close {
+      filter: invert(1) grayscale(100%) brightness(200%);
+    }
+
     .modal-backdrop.show { opacity: 0.75; }
 
     /* Amount input with currency prefix */
