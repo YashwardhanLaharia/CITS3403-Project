@@ -11,7 +11,7 @@ def test_group_creation_requires_name(client, user_factory, login_user):
         follow_redirects=True,
     )
 
-    assert Group.query.count() == 0
+    assert user.created_groups.count() == 0
 
 
 def test_group_creation_assigns_admin(client, user_factory, login_user):
