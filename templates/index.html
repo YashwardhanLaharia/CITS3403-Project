@@ -36,8 +36,13 @@
     </div>
 
     <div class="action-row">
-
-      {% include '_create_group_modal.html' %}
+      <div class="form-card" style="display:flex; flex-direction:column;">
+        <div class="form-card-title"><i class="bi bi-people-fill"></i> Create a Group</div>
+        <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:18px; line-height:1.5;">Start a new group for a trip, household, or any shared expense.</div>
+        <button class="btn-primary-action" style="margin-top:auto;" data-bs-toggle="modal" data-bs-target="#createGroupModal">
+          <i class="bi bi-plus-lg"></i> New Group
+        </button>
+      </div>
 
       <form action="{{ url_for('main.join_group') }}" method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -51,6 +56,8 @@
         </div>
       </form>
     </div>
+
+    {% include '_create_group_modal.html' %}
 
     <div class="section-header">
       <div>
@@ -78,7 +85,7 @@
         </a>
         {% endfor %}
       {% else %}
-        <div class="group-card" style="border:1px dashed var(--border); display:flex; align-items:center; justify-content:center; min-height:180px;">
+        <div class="group-card" style="border:1px dashed var(--border); display:flex; align-items:center; justify-content:center; min-height:140px; grid-column:1/-1;">
           <div style="text-align:center; color:var(--text-muted);">
             <i class="bi bi-people" style="font-size:2rem;"></i>
             <div style="margin-top:8px;">No groups yet. Create one or join with an invite code.</div>
