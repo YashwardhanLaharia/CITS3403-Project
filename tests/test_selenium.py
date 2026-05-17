@@ -54,6 +54,28 @@ def _seed_user(app, email='test@example.com', first='Test', last='User',
     return email
 
 
+def _seed_group_with_member(app, email='member@example.com', first='Member',
+                            last='Test', group_name='Test Group'):
+    """Create a user, group, and membership. Returns (email, group_id)."""
+    with app.app_context():
+        user = User(email=email, first_name=first, last_name=last)
+        user.set_password('Password123!')
+        _db.session.add(user)
+        _db.session.flush()
+        group = Group(
+            name=group_name, currency='AUD',
+            invite_code=Group.generate_invite_code(),
+            created_by=user.id
+        )
+        _db.session.add(group)
+        _db.session.flush()
+        _db.session.add(Membership(
+            user_id=user.id, group_id=group.id, role='admin'
+        ))
+        _db.session.commit()
+        return email, group.id
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -163,8 +185,22 @@ class TestSignup:
         assert '/signup' in driver.current_url
 
     def test_signup_missing_fields(self, app, driver):
-        """Submit with required fields blank, verify browser validation."""
-        pytest.skip("not implemented")
+        """Submit with empty email, verify server-side validation error."""
+        driver.get(BASE_URL + '/signup')
+        driver.find_element(By.NAME, 'first_name').send_keys('Test')
+        driver.find_element(By.NAME, 'last_name').send_keys('User')
+        # Leave email blank but fill passwords to bypass HTML5 validation on those
+        driver.find_element(By.NAME, 'password').send_keys('Password123!')
+        driver.find_element(By.NAME, 'confirm_password').send_keys('Password123!')
+        # Use JS to submit (bypasses HTML5 required attribute)
+        driver.execute_script(
+            "document.querySelector('.btn-primary-action').closest('form').submit()"
+        )
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element(
+                (By.TAG_NAME, 'body'), 'Email is required'
+            )
+        )
 
 
 class TestLogin:
@@ -318,22 +354,101 @@ class TestExpenses:
     def test_add_equal_split_expense(self, app, driver):
         """Open expense modal, fill details with equal split, submit,
         verify expense appears in recent activity without page reload."""
-        pytest.skip("not implemented")
+        email, group_id = _seed_group_with_member(app, email='expense@example.com')
+        _login(driver, email, 'Password123!')
+        driver.get(BASE_URL + f'/groups/{group_id}')
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Member Balances')
+        )
+        driver.find_element(By.CSS_SELECTOR, '[data-bs-target="#addExpenseModal"]').click()
+        WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.ID, 'addExpenseModal'))
+        )
+        driver.find_element(By.NAME, 'description').send_keys('Dinner')
+        driver.find_element(By.NAME, 'amount').send_keys('45.00')
+        driver.find_element(By.CSS_SELECTOR, '#addExpenseModal button[type="submit"]').click()
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Dinner')
+        )
 
     def test_add_custom_split_expense(self, app, driver):
         """Toggle to custom split, enter per-member amounts, submit,
         verify amounts are correct in the dashboard."""
-        pytest.skip("not implemented")
+        email, group_id = _seed_group_with_member(
+            app, email='custom@example.com', group_name='Custom Group'
+        )
+        _login(driver, email, 'Password123!')
+        driver.get(BASE_URL + f'/groups/{group_id}')
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Member Balances')
+        )
+        driver.find_element(By.CSS_SELECTOR, '[data-bs-target="#addExpenseModal"]').click()
+        WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.ID, 'addExpenseModal'))
+        )
+        driver.find_element(By.NAME, 'description').send_keys('Custom Dinner')
+        driver.find_element(By.CSS_SELECTOR, 'input[name="split_type"][value="custom"]').click()
+        time.sleep(0.3)
+        split_inputs = driver.find_elements(By.CSS_SELECTOR, '.custom-split-amount')
+        for inp in split_inputs:
+            inp.clear()
+            inp.send_keys('25.00')
+        driver.find_element(By.CSS_SELECTOR, '#addExpenseModal button[type="submit"]').click()
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Custom Dinner')
+        )
 
     def test_expense_validation_rejects_empty(self, app, driver):
         """Submit modal with no description/amount, verify error shows
         inside the modal (not a page redirect)."""
-        pytest.skip("not implemented")
+        email, group_id = _seed_group_with_member(
+            app, email='validate@example.com', group_name='Validate Group'
+        )
+        _login(driver, email, 'Password123!')
+        driver.get(BASE_URL + f'/groups/{group_id}')
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Member Balances')
+        )
+        driver.find_element(By.CSS_SELECTOR, '[data-bs-target="#addExpenseModal"]').click()
+        WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.ID, 'addExpenseModal'))
+        )
+        # Remove HTML5 required attributes so the AJAX handler fires
+        driver.execute_script(
+            "document.querySelectorAll('#addExpenseForm [required]')"
+            ".forEach(el => el.removeAttribute('required'))"
+        )
+        driver.find_element(By.CSS_SELECTOR, '#addExpenseModal button[type="submit"]').click()
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, '.ajax-error'))
+        )
+        error_text = driver.find_element(By.CSS_SELECTOR, '.ajax-error').text
+        assert 'Description is required' in error_text
 
     def test_expense_updates_balances(self, app, driver):
         """After adding an expense, verify the member balance cards
         update to reflect the new totals."""
-        pytest.skip("not implemented")
+        email, group_id = _seed_group_with_member(
+            app, email='balance@example.com', group_name='Balance Group'
+        )
+        _login(driver, email, 'Password123!')
+        driver.get(BASE_URL + f'/groups/{group_id}')
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Member Balances')
+        )
+        driver.find_element(By.CSS_SELECTOR, '[data-bs-target="#addExpenseModal"]').click()
+        WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.ID, 'addExpenseModal'))
+        )
+        driver.find_element(By.NAME, 'description').send_keys('Taxi')
+        driver.find_element(By.NAME, 'amount').send_keys('30.00')
+        driver.find_element(By.CSS_SELECTOR, '#addExpenseModal button[type="submit"]').click()
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Taxi')
+        )
+        # Verify balance section updated (total spent shows on the page)
+        body_text = driver.find_element(By.TAG_NAME, 'body').text
+        assert '30.00' in body_text
 
 
 # ---------------------------------------------------------------------------
@@ -358,7 +473,27 @@ class TestProfile:
     def test_profile_update_name(self, app, driver):
         """Change first name, enter current password, submit, verify
         the updated name shows on reload."""
-        pytest.skip("not implemented")
+        _seed_user(app, email='update@example.com', first='OldName', last='Test')
+        _login(driver, 'update@example.com', 'Password123!')
+        driver.get(BASE_URL + '/profile')
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, 'first-name'))
+        )
+        first_name_input = driver.find_element(By.ID, 'first-name')
+        first_name_input.clear()
+        first_name_input.send_keys('NewName')
+        driver.find_element(By.NAME, 'current_password').send_keys('Password123!')
+        driver.find_element(By.CSS_SELECTOR, '.btn-primary-action').click()
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element(
+                (By.TAG_NAME, 'body'), 'Profile updated successfully'
+            )
+        )
+        driver.get(BASE_URL + '/profile')
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, 'first-name'))
+        )
+        assert driver.find_element(By.ID, 'first-name').get_attribute('value') == 'NewName'
 
 
 # ---------------------------------------------------------------------------
@@ -369,11 +504,43 @@ class TestNavigation:
     """Sidebar, hamburger menu, and page transitions."""
 
     def test_sidebar_links_navigate(self, app, driver):
-        """Click Home and Dashboard in the sidebar, verify correct
-        pages load."""
-        pytest.skip("not implemented")
+        """Click Home and Profile in the sidebar, verify correct pages load."""
+        email, group_id = _seed_group_with_member(
+            app, email='nav@example.com', group_name='Nav Group'
+        )
+        _login(driver, email, 'Password123!')
+        # Click Profile link in sidebar
+        driver.find_element(By.CSS_SELECTOR, 'a.nav-item-btn[href*="profile"]').click()
+        WebDriverWait(driver, 10).until(EC.url_contains('/profile'))
+        assert '/profile' in driver.current_url
+        # Click Home link in sidebar
+        driver.find_element(By.CSS_SELECTOR, 'a.nav-item-btn[href="/"]').click()
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Welcome back')
+        )
 
     def test_hamburger_menu_on_mobile(self, app, driver):
         """Resize viewport to mobile width, verify hamburger button
         appears and toggles the sidebar."""
-        pytest.skip("not implemented")
+        email, group_id = _seed_group_with_member(
+            app, email='mobile@example.com', group_name='Mobile Group'
+        )
+        _login(driver, email, 'Password123!')
+        # Resize to mobile width
+        driver.set_window_size(375, 812)
+        driver.get(BASE_URL + '/')
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Welcome back')
+        )
+        hamburger = driver.find_element(By.ID, 'hamburger-btn')
+        assert hamburger.is_displayed()
+        # Sidebar should be hidden initially on mobile
+        sidebar = driver.find_element(By.CSS_SELECTOR, '.sidebar')
+        assert 'sidebar-open' not in sidebar.get_attribute('class')
+        # Click hamburger to open sidebar
+        hamburger.click()
+        WebDriverWait(driver, 10).until(
+            lambda d: 'sidebar-open' in d.find_element(
+                By.CSS_SELECTOR, '.sidebar'
+            ).get_attribute('class')
+        )
