@@ -30,7 +30,7 @@
     /* ── SIDEBAR ── */
     .sidebar {
       width: var(--sidebar-w);
-      min-height: 100vh;
+      height: 100vh;
       background: var(--bg-surface);
       border-right: 1px solid var(--border);
       display: flex;
@@ -39,6 +39,7 @@
       top: 0; left: 0;
       z-index: 100;
       padding: 24px 16px;
+      overflow-y: auto;
     }
 
     .sidebar-logo {
@@ -103,6 +104,56 @@
 
     .add-expense-btn:hover {
       background: #52e8b5;
+    }
+
+    .sidebar-groups-list {
+      max-height: 45vh;
+      overflow-y: auto;
+      margin-bottom: 4px;
+    }
+
+    .sidebar::-webkit-scrollbar,
+    .sidebar-groups-list::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .sidebar::-webkit-scrollbar-thumb,
+    .sidebar-groups-list::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
+
+    .sidebar-group-item {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+      padding: 8px 12px;
+      border-radius: 8px;
+      margin-bottom: 2px;
+      transition: background 0.15s;
+    }
+
+    .sidebar-group-item:hover {
+      background: var(--bg-card-alt);
+    }
+
+    .sidebar-group-item.active {
+      background: var(--accent-dim);
+    }
+
+    .sidebar-group-name {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sidebar-group-meta {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      margin-top: 1px;
     }
 
     .sidebar-bottom {
