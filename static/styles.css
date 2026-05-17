@@ -327,6 +327,28 @@
       box-shadow: 0 0 20px var(--accent-glow);
     }
 
+    .btn-outline-danger {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      background: transparent;
+      border-radius: 10px;
+      padding: 11px 24px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 700;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-outline-danger:hover {
+      background: var(--danger);
+      color: #0c0f1a;
+    }
+
     /* ── JOIN CARD ── */
     .join-card {
       background: linear-gradient(160deg, #1a2a4a, #0f1a35);
@@ -1560,6 +1582,41 @@
       font-family: 'DM Sans', sans-serif;
       font-size: 0.9rem;
     }
+
+/* ── EXPENSE ACTION BUTTONS ── */
+.btn-expense-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.btn-delete {
+  background: var(--danger-dim);
+  color: var(--danger);
+}
+
+.btn-delete:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn-edit {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.btn-edit:hover {
+  background: var(--accent);
+  color: #0c0f1a;
+}
 
 /* ── RESPONSIVE ── */
 

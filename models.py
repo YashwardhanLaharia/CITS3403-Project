@@ -10,11 +10,13 @@ class User(UserMixin, db.Model):
     __tablename__ = 'users'
 
     id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    email = db.Column(db.String(120), unique=True, nullable=True, index=True)
     password_hash = db.Column(db.String(256), nullable=False)
     first_name = db.Column(db.String(50), nullable=False)
     last_name = db.Column(db.String(50), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    status = db.Column(db.String(20), nullable=False, default='active', server_default='active')
+    deleted_at = db.Column(db.DateTime, nullable=True)
 
     memberships = db.relationship('Membership', back_populates='user', lazy='dynamic')
     created_groups = db.relationship('Group', back_populates='creator', lazy='dynamic')
@@ -25,6 +27,17 @@ class User(UserMixin, db.Model):
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+    @property
+    def display_name(self):
+        base = f'{self.first_name} {self.last_name}'
+        if self.status != 'active':
+            return f'{base} (deleted)'
+        return base
+
+    @property
+    def is_active(self):
+        return self.status == 'active'
 
     def __repr__(self):
         return f'<User {self.email}>'

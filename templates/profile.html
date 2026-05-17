@@ -8,6 +8,9 @@
     <button class="hamburger-btn" id="hamburger-btn" aria-label="Open menu">
       <i class="bi bi-list"></i>
     </button>
+    <div class="topnav-icons">
+      <div class="avatar-sm">{{ initials|default('--') }}</div>
+    </div>
   </nav>
 
   <div class="page-body">
@@ -21,10 +24,6 @@
 
     <div class="form-card" style="max-width:560px;">
       <div class="form-card-title"><i class="bi bi-person-circle"></i> Account Details</div>
-
-      <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 18px;">
-        <i class="bi bi-calendar3"></i> Member since: {{ created_at.strftime('%B %Y') }}
-      </div>
 
       <form method="POST" action="{{ url_for('main.profile') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
@@ -48,6 +47,11 @@
         </div>
 
         <div class="field-group">
+          <label class="form-label-sm">Member Since</label>
+          <div class="form-input" style="background:var(--bg-card); cursor:default;">{{ created_at.strftime('%B %Y') }}</div>
+        </div>
+
+        <div class="field-group">
           <label class="form-label-sm" for="current-password">Current Password</label>
           <input class="form-input" type="password" id="current-password" name="current_password"
                  placeholder="Required to save changes"/>
@@ -61,6 +65,21 @@
 
         <button type="submit" class="btn-primary-action">
           <i class="bi bi-check-lg"></i> Save Changes
+        </button>
+      </form>
+    </div>
+
+    <div class="form-card" style="max-width:560px; border-top:2px solid var(--danger);">
+      <div class="form-card-title" style="color:var(--danger);"><i class="bi bi-trash"></i> Delete Account</div>
+      <p class="text-muted" style="margin-bottom:12px;">Deleting your account flags it as deleted but keeps the shared group history intact; the email will be released and the account will be signed out immediately.</p>
+      <form method="POST" action="{{ url_for('main.delete_account') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="field-group">
+          <label class="form-label-sm" for="delete-password">Current Password</label>
+          <input class="form-input" type="password" id="delete-password" name="delete_password" placeholder="Required to confirm"/>
+        </div>
+        <button type="submit" class="btn-outline-danger" onclick="return confirm('Are you sure you want to delete your account? This action cannot be undone. Your contributed data will remain in shared groups.')">
+          <i class="bi bi-trash"></i> Permanently delete my account
         </button>
       </form>
     </div>

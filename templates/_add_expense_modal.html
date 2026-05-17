@@ -43,7 +43,7 @@
           </div>
           <div id="customSplitInputs" style="display:none;margin-top:1rem;">
             <label class="form-label-sm">Amount per person</label>
-            {% for member in members %}
+            {% for member in active_members or members %}
             <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">
               <span style="min-width:120px;">{{ member.name }}</span>
               <input class="form-input custom-split-amount" type="number" name="split_amount_{{ member.id }}" step="0.01" min="0" placeholder="0.00" style="flex:1;" oninput="updateCustomTotal()"/>
@@ -87,14 +87,18 @@ function updateCustomTotal() {
   document.getElementById('customSplitTotal').textContent = total.toFixed(2);
 }
 
-document.querySelector('input[name="expense_date"]').valueAsDate = new Date();
+const dateInput = document.querySelector('input[name="expense_date"]');
+if (dateInput) dateInput.valueAsDate = new Date();
 
-document.getElementById('addExpenseModal').addEventListener('hidden.bs.modal', function () {
-  this.querySelector('form').reset();
-  document.getElementById('equalSplitInputs').style.display = 'block';
-  document.getElementById('customSplitInputs').style.display = 'none';
-  document.getElementById('customSplitTotal').textContent = '0.00';
-  document.querySelector('input[name="amount"]').setAttribute('required', '');
-  document.querySelector('input[name="expense_date"]').valueAsDate = new Date();
-});
+const modal = document.getElementById('addExpenseModal');
+if (modal) {
+  modal.addEventListener('hidden.bs.modal', function () {
+    this.querySelector('form').reset();
+    document.getElementById('equalSplitInputs').style.display = 'block';
+    document.getElementById('customSplitInputs').style.display = 'none';
+    document.getElementById('customSplitTotal').textContent = '0.00';
+    document.querySelector('input[name="amount"]').setAttribute('required', '');
+    document.querySelector('input[name="expense_date"]').valueAsDate = new Date();
+  });
+}
 </script>
