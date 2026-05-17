@@ -119,9 +119,31 @@ class TestLogin:
         """Hitting /profile without auth redirects to /login."""
         pytest.skip("not implemented")
 
-    def test_logout(self):
+    def test_logout(self, live_app, driver):
         """Log out via sidebar, verify redirect to login page."""
-        pytest.skip("not implemented")
+        from models import User
+        app = create_app('testing')
+        with app.app_context():
+            user = User(
+                email='logouttest@example.com',
+                first_name='Logout',
+                last_name='Test'
+            )
+            user.set_password('Password123!')
+            _db.session.add(user)
+            _db.session.commit()
+
+        driver.get(live_app + '/login')
+        driver.find_element(By.NAME, 'email').send_keys('logouttest@example.com')
+        driver.find_element(By.NAME, 'password').send_keys('Password123!')
+        driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Welcome back')
+        )
+        driver.find_element(By.CSS_SELECTOR, '.sidebar-bottom form button[type="submit"]').click()
+        WebDriverWait(driver, 10).until(
+            EC.url_contains('/login')
+        )
 
 
 # ---------------------------------------------------------------------------
