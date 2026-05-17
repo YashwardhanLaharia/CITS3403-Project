@@ -167,3 +167,119 @@ def test_login_remember_me_option(client, user_factory):
     assert 'Set-Cookie' in response.headers
     session_cookie = response.headers.get('Set-Cookie', '')
     assert 'session' in session_cookie.lower()
+
+
+def test_profile_page_requires_login(client):
+    response = client.get('/profile', follow_redirects=False)
+    assert response.status_code == 302
+    assert '/login' in response.headers['Location']
+
+
+def test_profile_page_shows_user_data(client, user_factory, login_user):
+    user, password = user_factory(first_name='John', last_name='Doe')
+    login_user(user.email, password)
+
+    response = client.get('/profile')
+    assert response.status_code == 200
+    assert b'John' in response.data
+    assert b'Doe' in response.data
+
+
+def test_profile_update_with_wrong_password_fails(client, user_factory, login_user):
+    user, password = user_factory(first_name='OldName')
+    login_user(user.email, password)
+
+    response = client.post(
+        '/profile',
+        data={
+            'first_name': 'NewName',
+            'last_name': 'Doe',
+            'current_password': 'WrongPass123!',
+            'new_password': '',
+        },
+        follow_redirects=True,
+    )
+    assert b'incorrect' in response.data.lower()
+
+
+def test_profile_update_with_short_new_password_fails(client, user_factory, login_user):
+    user, password = user_factory(first_name='OldName')
+    login_user(user.email, password)
+
+    response = client.post(
+        '/profile',
+        data={
+            'first_name': 'NewName',
+            'last_name': 'Doe',
+            'current_password': password,
+            'new_password': 'short',
+        },
+        follow_redirects=True,
+    )
+    assert b'at least 8 characters' in response.data
+
+
+def test_profile_update_success_changes_name(client, user_factory, login_user):
+    user, password = user_factory(first_name='OldName', last_name='Smith')
+    login_user(user.email, password)
+
+    response = client.post(
+        '/profile',
+        data={
+            'first_name': 'NewName',
+            'last_name': 'Smith',
+            'current_password': password,
+            'new_password': '',
+        },
+        follow_redirects=True,
+    )
+    assert b'successfully' in response.data
+
+    from extensions import db
+    db.session.refresh(user)
+    assert user.first_name == 'NewName'
+
+
+def test_profile_update_with_new_password_logs_out(client, user_factory, login_user):
+    user, password = user_factory()
+    login_user(user.email, password)
+
+    response = client.post(
+        '/profile',
+        data={
+            'first_name': 'John',
+            'last_name': 'Doe',
+            'current_password': password,
+            'new_password': 'NewPass123!',
+        },
+        follow_redirects=True,
+    )
+    assert b'log in with your new password' in response.data
+
+
+def test_delete_account_with_wrong_password_fails(client, user_factory, login_user):
+    user, password = user_factory()
+    login_user(user.email, password)
+
+    response = client.post(
+        '/profile/delete',
+        data={'delete_password': 'WrongPass123!'},
+        follow_redirects=True,
+    )
+    assert b'incorrect' in response.data.lower()
+
+
+def test_delete_account_with_correct_password_succeeds(client, user_factory, login_user):
+    user, password = user_factory()
+    login_user(user.email, password)
+
+    response = client.post(
+        '/profile/delete',
+        data={'delete_password': password},
+        follow_redirects=True,
+    )
+
+    from extensions import db
+    db.session.refresh(user)
+    assert user.status == 'deleted'
+    assert user.email is None
