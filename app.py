@@ -35,6 +35,14 @@ def create_app(config_name=None):
     # Import models to register them with SQLAlchemy for migrations
     from models import User, Group, Membership, Expense, ExpenseSplit
 
+    @app.context_processor
+    def inject_user_initials():
+        from flask_login import current_user
+        if current_user.is_authenticated:
+            initials = f'{current_user.first_name[0]}{current_user.last_name[0]}'.upper()
+            return {'initials': initials}
+        return {}
+
     return app
 
 
