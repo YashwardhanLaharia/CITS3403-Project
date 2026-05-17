@@ -118,6 +118,7 @@
       display: flex;
       flex-direction: column;
       min-height: 100vh;
+      overflow: hidden;
     }
 
     /* ── TOP NAV ── */
@@ -125,7 +126,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 18px 32px;
+      padding: 14px 28px;
       border-bottom: 1px solid var(--border);
       background: var(--bg-surface);
       position: sticky;
@@ -166,7 +167,7 @@
     }
 
     /* ── PAGE BODY ── */
-    .page-body { padding: 36px 56px; flex: 1; width: 100%; max-width: 2000px; margin: 0 auto; }
+    .page-body { padding: 28px 40px; flex: 1; width: 100%; max-width: 2000px; margin: 0 auto; }
 
     /* ── WELCOME HEADER ── */
     .welcome-row {
@@ -174,16 +175,16 @@
       align-items: flex-start;
       justify-content: space-between;
       gap: 24px;
-      margin-bottom: 36px;
+      margin-bottom: 28px;
     }
 
     .welcome-title {
       font-family: 'Syne', sans-serif;
-      font-size: 1.8rem;
+      font-size: 1.5rem;
       font-weight: 600;
       color: var(--text-primary);
       line-height: 1.2;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     .welcome-sub {
@@ -255,12 +256,12 @@
     .form-card-title i { color: var(--accent); }
 
     .form-label-sm {
-      font-size: 0.7rem;
+      font-size: 0.68rem;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.8px;
       color: var(--text-muted);
-      margin-bottom: 6px;
+      margin-bottom: 5px;
       display: block;
     }
 
@@ -268,10 +269,10 @@
       width: 100%;
       background: var(--bg-base);
       border: 1px solid var(--border);
-      border-radius: 9px;
-      padding: 10px 14px;
+      border-radius: 8px;
+      padding: 9px 12px;
       font-family: 'DM Sans', sans-serif;
-      font-size: 0.875rem;
+      font-size: 0.85rem;
       color: var(--text-primary);
       outline: none;
       transition: border-color 0.2s;
@@ -459,7 +460,12 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 16px;
+      margin-top: 28px;
+      margin-bottom: 14px;
+    }
+
+    .section-header:first-child {
+      margin-top: 0;
     }
 
     .section-title {
@@ -676,7 +682,7 @@
     .login-left {
       width: 420px;
       flex-shrink: 0;
-      background: linear-gradient(160deg, #0d2a22 0%, #0c1a14 55%, #0c0f1a 100%);
+      background: linear-gradient(160deg, #112b24 0%, #111a20 55%, var(--bg-surface) 100%);
       border-right: 1px solid var(--border);
       display: flex;
       flex-direction: column;
@@ -690,7 +696,7 @@
       position: absolute;
       top: -80px; left: -80px;
       width: 320px; height: 320px;
-      background: radial-gradient(circle, rgba(61,217,164,0.08) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(61,217,164,0.06) 0%, transparent 70%);
       pointer-events: none;
     }
 
@@ -743,36 +749,36 @@
       align-items: center;
       justify-content: center;
       padding: 40px 32px;
-      background: var(--bg-base);
+      background: var(--bg-surface);
     }
 
     .login-card {
       width: 100%;
-      max-width: 420px;
+      max-width: 400px;
       background: var(--bg-card);
-      border: 1px solid var(--border);
+      border: 1px solid rgba(255,255,255,0.04);
       border-radius: var(--radius);
-      padding: 36px;
+      padding: 32px;
     }
 
-    .login-card--wide { max-width: 460px; }
+    .login-card--wide { max-width: 440px; }
 
     .login-heading {
       font-family: 'Syne', sans-serif;
       font-weight: 600;
-      font-size: 1.5rem;
+      font-size: 1.35rem;
       color: var(--text-primary);
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
 
     .login-sub {
       font-size: 0.875rem;
       color: var(--text-muted);
-      margin-bottom: 28px;
+      margin-bottom: 20px;
       line-height: 1.5;
     }
 
-    .field-group { margin-bottom: 16px; }
+    .field-group { margin-bottom: 12px; }
 
     /* Password field */
     .pw-wrap { position: relative; }
@@ -801,7 +807,7 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      margin: 22px 0;
+      margin: 16px 0;
     }
 
     .login-divider::before,
@@ -843,7 +849,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 24px;
+      margin-bottom: 16px;
     }
 
     .check-label {
@@ -856,10 +862,34 @@
     }
 
     .check-label input[type="checkbox"] {
-      width: 15px;
-      height: 15px;
-      accent-color: var(--accent);
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border: 1.5px solid var(--text-muted);
+      border-radius: 4px;
+      background: transparent;
       cursor: pointer;
+      position: relative;
+      flex-shrink: 0;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .check-label input[type="checkbox"]:checked {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .check-label input[type="checkbox"]:checked::after {
+      content: '';
+      position: absolute;
+      left: 4.5px;
+      top: 1.5px;
+      width: 5px;
+      height: 9px;
+      border: solid #0c0f1a;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
     }
 
     .forgot-link {
@@ -905,16 +935,39 @@
       display: flex;
       align-items: flex-start;
       gap: 10px;
-      margin-bottom: 24px;
+      margin-bottom: 16px;
     }
 
     .terms-row input[type="checkbox"] {
-      width: 15px;
-      height: 15px;
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
       margin-top: 2px;
-      accent-color: var(--accent);
+      border: 1.5px solid var(--text-muted);
+      border-radius: 4px;
+      background: transparent;
       cursor: pointer;
       flex-shrink: 0;
+      position: relative;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .terms-row input[type="checkbox"]:checked {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .terms-row input[type="checkbox"]:checked::after {
+      content: '';
+      position: absolute;
+      left: 4.5px;
+      top: 1.5px;
+      width: 5px;
+      height: 9px;
+      border: solid #0c0f1a;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
     }
 
     .terms-row label {
@@ -1585,6 +1638,22 @@
       border-radius: 8px;
       font-family: 'DM Sans', sans-serif;
       font-size: 0.9rem;
+    }
+
+    .toast-close {
+      background: none;
+      border: none;
+      color: inherit;
+      opacity: 0.5;
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 2px 4px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .toast-close:hover {
+      opacity: 1;
     }
 
 /* ── EXPENSE ACTION BUTTONS ── */

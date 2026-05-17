@@ -122,13 +122,13 @@
             {% elif e.category == 'Utilities' %}💡
             {% else %}📦{% endif %}
           </div>
-          <div>
+          <div style="flex:1;">
             <div class="archived-name">{{ e.description }}</div>
               <div class="archived-meta">
                 ${{ "%.2f"|format(e.amount) }} &middot; {{ e.category }} &middot; {{ e.date.strftime('%d %b %Y') }} &middot; paid by {{ e.payer.display_name }}
               </div>
           </div>
-          <div style="margin-top:8px;">
+          <div style="display:flex; gap:4px; flex-shrink:0; margin-left:auto;">
             <button type="button"
                     class="btn-expense-action btn-edit"
                     data-bs-toggle="modal"

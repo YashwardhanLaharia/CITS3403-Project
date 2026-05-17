@@ -2,15 +2,25 @@
 {% block title_suffix %} – Not Found{% endblock %}
 
 {% block body %}
-<div style="display:flex; align-items:center; justify-content:center; min-height:100vh; text-align:center;">
-  <div>
-    <div style="font-family:'Syne',sans-serif; font-size:5rem; font-weight:800; color:var(--accent);">404</div>
-    <div style="font-size:1.2rem; color:var(--text-muted); margin:16px 0 32px;">
-      The page you're looking for doesn't exist or has been moved.
+<div class="main-content">
+  <nav class="topnav">
+    <button class="hamburger-btn" id="hamburger-btn" aria-label="Open menu">
+      <i class="bi bi-list"></i>
+    </button>
+    <div class="topnav-icons">
+      <div class="avatar-sm">{{ initials|default('--') }}</div>
     </div>
-    <a href="{{ url_for('main.index') }}" class="btn-primary-action" style="text-decoration:none; display:inline-block;">
-      <i class="bi bi-house"></i> Back to Home
-    </a>
+  </nav>
+  <div class="page-body" style="flex:1; display:flex; align-items:center; justify-content:center; text-align:center;">
+    <div>
+      <div style="font-family:'Syne',sans-serif; font-size:3rem; font-weight:700; color:var(--accent);">404</div>
+      <div style="font-size:0.95rem; color:var(--text-muted); margin:12px 0 24px;">
+        The page you're looking for doesn't exist or has been moved.
+      </div>
+      <a href="{{ url_for('main.index') }}" class="btn-primary-action" style="text-decoration:none; display:inline-block;">
+        <i class="bi bi-house"></i> Back to Home
+      </a>
+    </div>
   </div>
 </div>
 {% endblock %}
