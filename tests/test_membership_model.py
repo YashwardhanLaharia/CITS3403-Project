@@ -89,6 +89,7 @@ def test_duplicate_membership_raises_integrity_error(app, user_factory):
 
     with pytest.raises(IntegrityError):
         db.session.commit()
+    db.session.rollback()
 
 
 def test_membership_joined_at_is_set(app, user_factory):
