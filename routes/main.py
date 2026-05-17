@@ -1,4 +1,5 @@
 import re
+import secrets
 from datetime import datetime, date
 from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
 from flask_login import login_required, current_user, logout_user
@@ -389,7 +390,7 @@ def delete_account():
     current_user.status = 'deleted'
     current_user.deleted_at = datetime.utcnow()
     current_user.email = None
-    current_user.password_hash = None
+    current_user.set_password(secrets.token_hex(32))
     db.session.commit()
     logout_user()
     flash('Your account was deleted. The data you contributed remains in shared groups.', 'info')
