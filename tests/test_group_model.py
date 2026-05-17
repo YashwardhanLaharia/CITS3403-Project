@@ -71,3 +71,35 @@ def test_group_default_currency_is_aud(app, user_factory):
     db.session.commit()
 
     assert group.currency == 'AUD'
+
+
+def test_group_created_at_is_set_auto(app, user_factory):
+    user, _ = user_factory()
+
+    group = Group(
+        name='Timestamp Test',
+        created_by=user.id,
+        invite_code=Group.generate_invite_code(),
+    )
+    db.session.add(group)
+    db.session.commit()
+
+    assert group.created_at is not None
+
+
+def test_group_start_and_end_date_can_be_set(app, user_factory):
+    from datetime import date
+    user, _ = user_factory()
+
+    group = Group(
+        name='Date Range Group',
+        created_by=user.id,
+        invite_code=Group.generate_invite_code(),
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+    db.session.add(group)
+    db.session.commit()
+
+    assert group.start_date == date(2025, 1, 1)
+    assert group.end_date == date(2025, 12, 31)

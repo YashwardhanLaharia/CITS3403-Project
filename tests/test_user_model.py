@@ -85,3 +85,16 @@ def test_user_display_name_with_deleted_status(app):
     db.session.commit()
 
     assert user.display_name == 'John Doe (deleted)'
+
+
+def test_user_created_at_is_set_auto(app):
+    user = User(
+        email='created-at@example.com',
+        first_name='Test',
+        last_name='User',
+    )
+    user.set_password('TempPass123!')
+    db.session.add(user)
+    db.session.commit()
+
+    assert user.created_at is not None
