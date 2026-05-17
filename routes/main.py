@@ -227,6 +227,8 @@ def _compute_group_data(members_by_id, expenses):
             'from_name': members_by_id[debtor_id].display_name,
             'to_name': members_by_id[creditor_id].display_name,
             'amount': round(amount, 2),
+            'debtor_id': debtor_id,
+            'creditor_id': creditor_id,
         })
         debtors[i][1] -= amount
         creditors[j][1] -= amount

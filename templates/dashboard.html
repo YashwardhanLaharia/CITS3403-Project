@@ -174,11 +174,20 @@
       {% if transfers %}
         {% for t in transfers %}
         <div class="archived-card">
-          <div class="archived-icon"><i class="bi bi-arrow-right-circle"></i></div>
-          <div>
+          <div style="flex:1;">
             <div class="archived-name">{{ t.from_name }} → {{ t.to_name }}</div>
             <div class="archived-meta">${{ "%.2f"|format(t.amount) }}</div>
           </div>
+          {% if current_user.id == t.debtor_id %}
+          <form method="POST" action="/groups/{{ group.id }}/settle" style="margin:0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="debtor_id" value="{{ t.debtor_id }}">
+            <input type="hidden" name="creditor_id" value="{{ t.creditor_id }}">
+            <button type="submit" class="btn-expense-action btn-edit">
+              <i class="bi bi-check-circle"></i> Mark as Paid
+            </button>
+          </form>
+          {% endif %}
         </div>
         {% endfor %}
       {% else %}
