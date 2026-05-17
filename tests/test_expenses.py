@@ -221,6 +221,7 @@ def test_add_expense_non_numeric_amount(client, user_factory, group_factory, log
         follow_redirects=True,
     )
     assert b'valid number' in response.data.lower()
+    assert Expense.query.filter_by(description='Non-numeric').first() is None
 
 
 def test_add_expense_invalid_category(client, user_factory, group_factory, login_user):
@@ -238,6 +239,7 @@ def test_add_expense_invalid_category(client, user_factory, group_factory, login
         follow_redirects=True,
     )
     assert b'valid category' in response.data.lower()
+    assert Expense.query.filter_by(description='Test').first() is None
 
 
 def test_add_expense_invalid_date_format(client, user_factory, group_factory, login_user):
@@ -256,6 +258,7 @@ def test_add_expense_invalid_date_format(client, user_factory, group_factory, lo
         follow_redirects=True,
     )
     assert b'date' in response.data.lower()
+    assert Expense.query.filter_by(description='Test').count() == 0
 
 
 def test_add_expense_custom_split_negative_amount(client, user_factory, group_factory, login_user):
@@ -279,6 +282,7 @@ def test_add_expense_custom_split_negative_amount(client, user_factory, group_fa
         follow_redirects=True,
     )
     assert b'negative' in response.data.lower()
+    assert Expense.query.filter_by(description='Negative Split').first() is None
 
 
 def test_add_expense_creates_expense_with_correct_fields(client, user_factory, group_factory, login_user):
@@ -327,6 +331,7 @@ def test_add_expense_custom_split_zero_total(client, user_factory, group_factory
         follow_redirects=True,
     )
     assert b'greater than zero' in response.data.lower()
+    assert Expense.query.filter_by(description='Zero Split Total').first() is None
 
 
 def test_add_expense_ajax_validation_error_returns_json(client, user_factory, group_factory, login_user):

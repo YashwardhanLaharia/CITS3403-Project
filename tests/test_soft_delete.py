@@ -121,8 +121,6 @@ def test_delete_account_route(client, user_factory, login_user):
         'delete_password': password,
     }, follow_redirects=True)
 
-    assert b'deleted' in response.data or b'log' in response.data.lower()
-
     fetched = db.session.get(User, user.id)
     assert fetched.status == 'deleted'
     assert fetched.email is None

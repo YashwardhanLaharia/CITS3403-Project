@@ -10,7 +10,7 @@ def test_membership_default_role_is_member(app, user_factory):
         name='Test Group',
         currency='AUD',
         created_by=user.id,
-        invite_code='TEST1234',
+        invite_code=Group.generate_invite_code(),
     )
     db.session.add(group)
     db.session.flush()
@@ -28,7 +28,7 @@ def test_membership_can_have_admin_role(app, user_factory):
         name='Admin Group',
         currency='AUD',
         created_by=user.id,
-        invite_code='ADMIN001',
+        invite_code=Group.generate_invite_code(),
     )
     db.session.add(group)
     db.session.flush()
@@ -47,13 +47,13 @@ def test_user_can_belong_to_multiple_groups(app, user_factory):
         name='Group One',
         currency='AUD',
         created_by=user.id,
-        invite_code='GROUPONE',
+        invite_code=Group.generate_invite_code(),
     )
     group2 = Group(
         name='Group Two',
         currency='USD',
         created_by=user.id,
-        invite_code='GROUPTWO',
+        invite_code=Group.generate_invite_code(),
     )
     db.session.add(group1)
     db.session.add(group2)
@@ -75,7 +75,7 @@ def test_duplicate_membership_raises_integrity_error(app, user_factory):
         name='Single Group',
         currency='AUD',
         created_by=user.id,
-        invite_code='SINGLE01',
+        invite_code=Group.generate_invite_code(),
     )
     db.session.add(group)
     db.session.flush()
@@ -98,7 +98,7 @@ def test_membership_joined_at_is_set(app, user_factory):
         name='Timestamp Group',
         currency='AUD',
         created_by=user.id,
-        invite_code='TIME001',
+        invite_code=Group.generate_invite_code(),
     )
     db.session.add(group)
     db.session.flush()

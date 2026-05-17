@@ -13,7 +13,7 @@ def test_expense_split_type_default_is_equal(app, user_factory):
         name='Default Split Group',
         currency='AUD',
         created_by=user.id,
-        invite_code='DEFAULTSPL',
+        invite_code=Group.generate_invite_code(),
     )
     db.session.add(group)
     db.session.flush()
@@ -41,7 +41,7 @@ def test_expense_split_type_can_be_custom(app, user_factory):
         name='Custom Split Group',
         currency='AUD',
         created_by=user.id,
-        invite_code='CUSTOMSPL',
+        invite_code=Group.generate_invite_code(),
     )
     db.session.add(group)
     db.session.flush()
@@ -70,7 +70,7 @@ def test_expense_split_is_paid_default_is_false(app, user_factory):
         name='Paid Status Group',
         currency='AUD',
         created_by=user.id,
-        invite_code='PAIDSTAT',
+        invite_code=Group.generate_invite_code(),
     )
     db.session.add(group)
     db.session.flush()
@@ -106,7 +106,7 @@ def test_expense_split_is_paid_can_be_true(app, user_factory):
         name='Mark Paid Group',
         currency='AUD',
         created_by=user.id,
-        invite_code='MARKPAID',
+        invite_code=Group.generate_invite_code(),
     )
     db.session.add(group)
     db.session.flush()
@@ -143,7 +143,7 @@ def test_expense_split_unique_constraint_prevents_duplicate(app, user_factory):
         name='Unique Split Group',
         currency='AUD',
         created_by=user.id,
-        invite_code='UNIQSPLT',
+        invite_code=Group.generate_invite_code(),
     )
     db.session.add(group)
     db.session.flush()
@@ -189,7 +189,7 @@ def test_expense_amount_stored_as_decimal(app, user_factory):
         name='Decimal Group',
         currency='AUD',
         created_by=user.id,
-        invite_code='DECIMAL1',
+        invite_code=Group.generate_invite_code(),
     )
     db.session.add(group)
     db.session.flush()
@@ -210,7 +210,7 @@ def test_expense_amount_stored_as_decimal(app, user_factory):
 
     fetched = db.session.get(Expense, expense.id)
     assert isinstance(fetched.amount, Decimal)
-    assert float(fetched.amount) == 33.33
+    assert fetched.amount == Decimal('33.33')
 
 
 def test_expense_split_share_amount_stored_as_decimal(app, user_factory):
@@ -219,7 +219,7 @@ def test_expense_split_share_amount_stored_as_decimal(app, user_factory):
         name='Share Decimal Group',
         currency='AUD',
         created_by=user.id,
-        invite_code='SHRDECML',
+        invite_code=Group.generate_invite_code(),
     )
     db.session.add(group)
     db.session.flush()
@@ -248,7 +248,7 @@ def test_expense_split_share_amount_stored_as_decimal(app, user_factory):
 
     fetched = db.session.get(ExpenseSplit, split.id)
     assert isinstance(fetched.share_amount, Decimal)
-    assert float(fetched.share_amount) == 16.67
+    assert fetched.share_amount == Decimal('16.67')
 
 
 def test_expense_default_date_is_today(app, user_factory):
@@ -257,7 +257,7 @@ def test_expense_default_date_is_today(app, user_factory):
         name='Date Default Group',
         currency='AUD',
         created_by=user.id,
-        invite_code='DATEDEFL',
+        invite_code=Group.generate_invite_code(),
     )
     db.session.add(group)
     db.session.flush()

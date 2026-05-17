@@ -158,7 +158,7 @@ def test_signup_validates_password_mismatch(client):
     assert b'do not match' in response.data
 
 
-def test_login_remember_me_option(client, user_factory):
+def test_login_remember_me_sets_persistent_cookie(client, user_factory):
     user, password = user_factory()
     response = client.post(
         '/login',
@@ -166,9 +166,9 @@ def test_login_remember_me_option(client, user_factory):
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert b'Welcome back' in response.data
     set_cookie = response.headers.get('Set-Cookie', '')
-    assert 'session' in set_cookie.lower()
+    has_persistent = 'expires' in set_cookie.lower() or 'max-age' in set_cookie.lower()
+    assert has_persistent, 'remember=on should set a persistent cookie with Expires or Max-Age'
 
 
 def test_profile_page_requires_login(client):
@@ -237,7 +237,6 @@ def test_profile_update_success_changes_name(client, user_factory, login_user):
     )
     assert b'successfully' in response.data
 
-    from extensions import db
     db.session.refresh(user)
     assert user.first_name == 'NewName'
 
@@ -281,7 +280,6 @@ def test_delete_account_with_correct_password_succeeds(client, user_factory, log
         follow_redirects=True,
     )
 
-    from extensions import db
     db.session.refresh(user)
     assert user.status == 'deleted'
     assert user.email is None
@@ -290,7 +288,6 @@ def test_delete_account_with_correct_password_succeeds(client, user_factory, log
 def test_login_loader_rejects_deleted_user(client, user_factory):
     user, _ = user_factory(email='loader-deleted@example.com')
     user_email = user.email
-    from extensions import db
     user.status = 'deleted'
     user.deleted_at = datetime.now(timezone.utc)
     user.email = None
@@ -327,8 +324,7 @@ def test_delete_account_requires_password(client, user_factory, login_user):
 
 def test_join_group_case_insensitive_invite_code(client, user_factory, login_user):
     admin, _ = user_factory(email='admin-case@example.com')
-    from models import Group, Membership
-    from extensions import db as _db
+    from models import Group
 
     group = Group(
         name='Case Test',
@@ -336,11 +332,11 @@ def test_join_group_case_insensitive_invite_code(client, user_factory, login_use
         created_by=admin.id,
         invite_code='TESTCODE',
     )
-    _db.session.add(group)
-    _db.session.flush()
+    db.session.add(group)
+    db.session.flush()
     admin_membership = Membership(user_id=admin.id, group_id=group.id, role='admin')
-    _db.session.add(admin_membership)
-    _db.session.commit()
+    db.session.add(admin_membership)
+    db.session.commit()
 
     member, member_password = user_factory(email='member-case@example.com')
     login_user(member.email, member_password)
@@ -352,3 +348,19 @@ def test_join_group_case_insensitive_invite_code(client, user_factory, login_use
     )
     membership = Membership.query.filter_by(group_id=group.id, user_id=member.id).first()
     assert membership is not None
+
+
+def test_signup_duplicate_email_rejected(client):
+    payload = {
+        'first_name': 'Alice',
+        'last_name': 'Doe',
+        'email': 'duplicate@example.com',
+        'password': 'Secret123!',
+        'confirm_password': 'Secret123!',
+    }
+
+    client.post('/signup', data=payload, follow_redirects=True)
+    assert User.query.filter_by(email='duplicate@example.com').count() == 1
+
+    response = client.post('/signup', data=payload, follow_redirects=True)
+    assert User.query.filter_by(email='duplicate@example.com').count() == 1

@@ -13,7 +13,7 @@ def test_compute_group_data_balance_calculation(app, user_factory):
         name='Settlement Group',
         currency='AUD',
         created_by=user1.id,
-        invite_code='SETTLE01',
+        invite_code=Group.generate_invite_code(),
     )
     db.session.add(group)
     db.session.flush()
@@ -65,7 +65,7 @@ def test_compute_group_data_settlement_transfers(app, user_factory):
         name='Transfer Group',
         currency='AUD',
         created_by=user1.id,
-        invite_code='TRANSFER',
+        invite_code=Group.generate_invite_code(),
     )
     db.session.add(group)
     db.session.flush()
@@ -113,7 +113,7 @@ def test_compute_group_data_zero_balance_no_transfer(app, user_factory):
         name='Equal Group',
         currency='AUD',
         created_by=user1.id,
-        invite_code='EQUALGRP',
+        invite_code=Group.generate_invite_code(),
     )
     db.session.add(group)
     db.session.flush()
@@ -167,7 +167,7 @@ def test_compute_group_data_category_totals(app, user_factory):
         name='Category Group',
         currency='AUD',
         created_by=user1.id,
-        invite_code='CATEGGRP',
+        invite_code=Group.generate_invite_code(),
     )
     db.session.add(group)
     db.session.flush()
@@ -224,7 +224,7 @@ def test_compute_group_data_empty_group(app, user_factory):
         name='Empty Group',
         currency='AUD',
         created_by=user1.id,
-        invite_code='EMPTYGRP',
+        invite_code=Group.generate_invite_code(),
     )
     db.session.add(group)
     db.session.commit()
@@ -248,7 +248,7 @@ def test_compute_group_data_three_member_settlement(app, user_factory):
         name='Three Member Group',
         currency='AUD',
         created_by=user1.id,
-        invite_code='THREEGRP',
+        invite_code=Group.generate_invite_code(),
     )
     db.session.add(group)
     db.session.flush()
