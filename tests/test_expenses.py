@@ -126,7 +126,7 @@ def test_add_expense_returns_404_for_non_member(client, user_factory, group_fact
     assert response.status_code == 404
 
 
-def test_add_expense_missing_description_validation(client, user_factory, group_factory, login_user):
+def test_add_expense_missing_description_validation(client, user_factory, group_factory, login_user, app):
     admin, password = user_factory(email='admin-desc@example.com')
     group = group_factory(creator=admin)
     login_user(admin.email, password)
@@ -141,9 +141,12 @@ def test_add_expense_missing_description_validation(client, user_factory, group_
         follow_redirects=True,
     )
     assert b'description' in response.data.lower()
+    with app.app_context():
+        expense = Expense.query.filter_by(group_id=group.id, description='').first()
+        assert expense is None
 
 
-def test_add_expense_missing_amount_validation(client, user_factory, group_factory, login_user):
+def test_add_expense_missing_amount_validation(client, user_factory, group_factory, login_user, app):
     admin, password = user_factory(email='admin-amt@example.com')
     group = group_factory(creator=admin)
     login_user(admin.email, password)
@@ -158,9 +161,12 @@ def test_add_expense_missing_amount_validation(client, user_factory, group_facto
         follow_redirects=True,
     )
     assert b'amount' in response.data.lower()
+    with app.app_context():
+        expense = Expense.query.filter_by(group_id=group.id, description='Test Expense').first()
+        assert expense is None
 
 
-def test_add_expense_invalid_amount_negative(client, user_factory, group_factory, login_user):
+def test_add_expense_invalid_amount_negative(client, user_factory, group_factory, login_user, app):
     admin, password = user_factory(email='admin-neg@example.com')
     group = group_factory(creator=admin)
     login_user(admin.email, password)
@@ -175,9 +181,12 @@ def test_add_expense_invalid_amount_negative(client, user_factory, group_factory
         follow_redirects=True,
     )
     assert b'positive' in response.data.lower()
+    with app.app_context():
+        expense = Expense.query.filter_by(group_id=group.id, description='Negative').first()
+        assert expense is None
 
 
-def test_add_expense_invalid_amount_zero(client, user_factory, group_factory, login_user):
+def test_add_expense_invalid_amount_zero(client, user_factory, group_factory, login_user, app):
     admin, password = user_factory(email='admin-zero@example.com')
     group = group_factory(creator=admin)
     login_user(admin.email, password)
@@ -192,6 +201,9 @@ def test_add_expense_invalid_amount_zero(client, user_factory, group_factory, lo
         follow_redirects=True,
     )
     assert b'positive' in response.data.lower()
+    with app.app_context():
+        expense = Expense.query.filter_by(group_id=group.id, description='Zero').first()
+        assert expense is None
 
 
 def test_add_expense_non_numeric_amount(client, user_factory, group_factory, login_user):
