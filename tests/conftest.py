@@ -1,13 +1,15 @@
+import uuid
+
 import pytest
-from datetime import date
 from app import create_app
 from extensions import db as _db
-from models import User, Group, Membership, Expense, ExpenseSplit
+from models import Group, Membership, User
 
 
-@pytest.fixture()
+@pytest.fixture
 def app():
     app = create_app('testing')
+
     with app.app_context():
         _db.create_all()
         yield app
@@ -15,91 +17,64 @@ def app():
         _db.drop_all()
 
 
-@pytest.fixture()
-def db(app):
-    return _db
-
-
-@pytest.fixture()
+@pytest.fixture
 def client(app):
     return app.test_client()
 
 
-@pytest.fixture()
-def user(db):
-    u = User(email='alice@test.com', first_name='Alice', last_name='Smith')
-    u.set_password('password123')
-    db.session.add(u)
-    db.session.commit()
-    return u
+def _build_unique_email(prefix='user'):
+    return f"{prefix}-{uuid.uuid4().hex[:8]}@example.com"
 
 
-@pytest.fixture()
-def other_user(db):
-    u = User(email='bob@test.com', first_name='Bob', last_name='Jones')
-    u.set_password('password123')
-    db.session.add(u)
-    db.session.commit()
-    return u
+@pytest.fixture
+def user_factory():
+    def _create_user(**kwargs):
+        defaults = {
+            'email': _build_unique_email('test'),
+            'first_name': 'Test',
+            'last_name': 'User',
+            'password': 'Secret123!'
+        }
+        defaults.update(kwargs)
+        password = defaults.pop('password')
+        user = User(**defaults)
+        user.set_password(password)
+        _db.session.add(user)
+        _db.session.commit()
+        return user, password
+
+    return _create_user
 
 
-@pytest.fixture()
-def group(db, user):
-    g = Group(name='Test Group', currency='AUD', invite_code='TESTCODE', created_by=user.id)
-    db.session.add(g)
-    db.session.flush()
-    m = Membership(user_id=user.id, group_id=g.id, role='admin')
-    db.session.add(m)
-    db.session.commit()
-    return g
+@pytest.fixture
+def group_factory(user_factory):
+    def _create_group(creator=None, **kwargs):
+        if creator is None:
+            creator, _ = user_factory()
+
+        group = Group(
+            name=kwargs.get('name', 'Test Group'),
+            currency=kwargs.get('currency', 'AUD'),
+            created_by=creator.id,
+            invite_code=Group.generate_invite_code(),
+        )
+        _db.session.add(group)
+        _db.session.flush()
+        membership = Membership(user_id=creator.id, group_id=group.id, role=kwargs.get('role', 'admin'))
+        _db.session.add(membership)
+        _db.session.commit()
+        return group
+
+    return _create_group
 
 
-@pytest.fixture()
-def group_with_both(db, group, other_user):
-    m = Membership(user_id=other_user.id, group_id=group.id, role='member')
-    db.session.add(m)
-    db.session.commit()
-    return group
+@pytest.fixture
+def login_user(client):
+    def _login(email, password):
+        return client.post(
+            '/login',
+            data={'email': email, 'password': password},
+            follow_redirects=True,
+        )
 
-
-@pytest.fixture()
-def expense(db, group_with_both, user, other_user):
-    e = Expense(
-        group_id=group_with_both.id,
-        paid_by=user.id,
-        description='Groceries',
-        amount=100.00,
-        category='Food',
-        date=date(2026, 5, 1),
-        split_type='equal',
-    )
-    db.session.add(e)
-    db.session.flush()
-    for uid in [user.id, other_user.id]:
-        s = ExpenseSplit(expense_id=e.id, user_id=uid, share_amount=50.00)
-        db.session.add(s)
-    db.session.commit()
-    return e
-
-
-@pytest.fixture()
-def custom_expense(db, group_with_both, user, other_user):
-    e = Expense(
-        group_id=group_with_both.id,
-        paid_by=user.id,
-        description='Custom dinner',
-        amount=90.00,
-        category='Food',
-        date=date(2026, 5, 2),
-        split_type='custom',
-    )
-    db.session.add(e)
-    db.session.flush()
-    db.session.add(ExpenseSplit(expense_id=e.id, user_id=user.id, share_amount=60.00))
-    db.session.add(ExpenseSplit(expense_id=e.id, user_id=other_user.id, share_amount=30.00))
-    db.session.commit()
-    return e
-
-
-def login(client, email='alice@test.com', password='password123'):
-    return client.post('/login', data={'email': email, 'password': password}, follow_redirects=True)
+    return _login

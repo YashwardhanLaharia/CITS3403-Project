@@ -1,6 +1,7 @@
 import re
 import secrets
-from datetime import datetime, date
+from urllib.parse import urlparse
+from datetime import datetime, date, timezone
 from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
 from flask_login import login_required, current_user, logout_user
 from sqlalchemy import func
@@ -26,7 +27,7 @@ def index():
     groups_by_id = {m.group_id: m.group for m in memberships}
 
     if not group_ids:
-        return render_template('index.html', first_name=current_user.first_name, groups=[], net_balance=0.0)
+        return render_template('index.html', first_name=current_user.first_name, groups=[], net_balance=0.0, active_page='home')
 
     member_counts = dict(
         db.session.query(Membership.group_id, func.count(Membership.id))
@@ -79,6 +80,7 @@ def index():
         first_name=current_user.first_name,
         groups=groups,
         net_balance=net_balance,
+        active_page='home',
     )
 
 
@@ -102,6 +104,8 @@ def login():
                 from flask_login import login_user
                 login_user(user, remember=bool(remember))
                 next_page = request.args.get('next')
+                if next_page and urlparse(next_page).netloc:
+                    next_page = None
                 flash(f'Welcome back, {user.first_name}!', 'success')
                 return redirect(next_page or url_for('main.index'))
             else:
@@ -262,6 +266,7 @@ def group_dashboard(group_id):
         transfers=transfers,
         total_spent=total_spent,
         expense_categories=EXPENSE_CATEGORIES,
+        active_page='dashboard',
     )
 
 
@@ -374,13 +379,15 @@ def profile():
                                first_name=first_name or current_user.first_name,
                                last_name=last_name or current_user.last_name,
                                email=current_user.email,
-                               created_at=current_user.created_at)
+                               created_at=current_user.created_at,
+                               active_page='profile')
 
     return render_template('profile.html',
                            first_name=current_user.first_name,
                            last_name=current_user.last_name,
                            email=current_user.email,
-                           created_at=current_user.created_at)
+                           created_at=current_user.created_at,
+                           active_page='profile')
 
 
 @main_bp.route('/profile/delete', methods=['POST'])
@@ -396,7 +403,7 @@ def delete_account():
         return redirect(url_for('main.profile'))
 
     current_user.status = 'deleted'
-    current_user.deleted_at = datetime.utcnow()
+    current_user.deleted_at = datetime.now(timezone.utc)
     current_user.email = None
     current_user.set_password(secrets.token_hex(32))
     db.session.commit()

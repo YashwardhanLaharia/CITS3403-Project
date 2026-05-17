@@ -72,7 +72,7 @@ def seed():
                 paid_by=user1.id,
                 description='Petrol',
                 amount=60.00,
-                category='transport',
+                category='Transport',
                 date=date(2024, 7, 1),
                 split_type='equal'
             ),
@@ -81,7 +81,7 @@ def seed():
                 paid_by=user2.id,
                 description='Groceries',
                 amount=45.50,
-                category='food',
+                category='Food',
                 date=date(2024, 7, 2),
                 split_type='equal'
             ),
@@ -90,7 +90,7 @@ def seed():
                 paid_by=user3.id,
                 description='Hotel',
                 amount=150.00,
-                category='accommodation',
+                category='Accommodation',
                 date=date(2024, 7, 3),
                 split_type='equal'
             ),
@@ -99,7 +99,7 @@ def seed():
                 paid_by=user1.id,
                 description='Dinner',
                 amount=85.00,
-                category='food',
+                category='Food',
                 date=date(2024, 7, 4),
                 split_type='equal'
             ),
@@ -108,7 +108,7 @@ def seed():
                 paid_by=user2.id,
                 description='Museum tickets',
                 amount=30.00,
-                category='entertainment',
+                category='Entertainment',
                 date=date(2024, 7, 5),
                 split_type='equal'
             ),
@@ -158,7 +158,7 @@ def seed():
             paid_by=user2.id,
             description='Restaurant Bill',
             amount=75.00,
-            category='food',
+            category='Food',
             date=date(2024, 7, 15),
             split_type='custom'
         )
