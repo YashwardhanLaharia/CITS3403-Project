@@ -31,7 +31,7 @@
       <div class="form-card-title"><i class="bi bi-person-circle"></i> Account Details</div>
 
         <form method="POST" action="{{ url_for('main.profile') }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <div class="field-row-2 field-group">
           <div>
             <label class="form-label-sm" for="first-name">First Name</label>
