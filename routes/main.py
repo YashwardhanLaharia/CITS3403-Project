@@ -389,6 +389,7 @@ def delete_account():
     current_user.status = 'deleted'
     current_user.deleted_at = datetime.utcnow()
     current_user.email = None
+    current_user.password_hash = None
     db.session.commit()
     logout_user()
     flash('Your account was deleted. The data you contributed remains in shared groups.', 'info')
