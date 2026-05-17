@@ -8,9 +8,8 @@
     <button class="hamburger-btn" id="hamburger-btn" aria-label="Open menu">
       <i class="bi bi-list"></i>
     </button>
-    <div class="search-bar">
-      <i class="bi bi-search"></i>
-      Search...
+    <div class="topnav-icons">
+      <div class="avatar-sm">{{ initials|default('--') }}</div>
     </div>
   </nav>
 
@@ -45,6 +44,11 @@
           <label class="form-label-sm" for="email">Email Address</label>
           <input class="form-input" type="email" id="email" name="email"
                  value="{{ email|default('') }}" disabled/>
+        </div>
+
+        <div class="field-group">
+          <label class="form-label-sm">Member Since</label>
+          <div class="form-input" style="background:var(--bg-card); cursor:default;">{{ created_at.strftime('%B %Y') }}</div>
         </div>
 
         <div class="field-group">
