@@ -43,8 +43,7 @@ def user_factory():
         _db.session.commit()
         return user, password
 
-    yield _create_user
-
+    return _create_user
 
 
 @pytest.fixture
@@ -66,7 +65,7 @@ def group_factory(user_factory):
         _db.session.commit()
         return group
 
-    yield _create_group
+    return _create_group
 
 
 @pytest.fixture
