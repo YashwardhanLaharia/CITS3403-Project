@@ -1,3 +1,5 @@
+import json
+
 from extensions import db as _db
 from models import Expense, ExpenseSplit, Group, Membership
 
@@ -118,7 +120,6 @@ def test_group_with_three_members_complex_settlement(client, user_factory, group
     total = sum(float(e.amount) for e in expenses)
     assert total == 150.00
 
-    import json
     data_response = client.get(f'/groups/{group.id}/data')
     data = json.loads(data_response.data)
     assert data['group']['total_spent'] == 150.00

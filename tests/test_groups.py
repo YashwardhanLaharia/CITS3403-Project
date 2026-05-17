@@ -1,3 +1,6 @@
+import json
+
+from extensions import db
 from models import Group, Membership
 
 
@@ -98,7 +101,6 @@ def test_group_data_api_returns_json(client, user_factory, group_factory, login_
     assert response.status_code == 200
     assert response.content_type == 'application/json'
 
-    import json
     data = json.loads(response.data)
     assert 'group' in data
     assert data['group']['name'] == group.name
@@ -157,10 +159,8 @@ def test_leave_group_success(client, user_factory, group_factory, login_user):
     group = group_factory(creator=admin)
     member, member_password = user_factory(email='member-leave@example.com')
 
-    from extensions import db as _db
-    from models import Membership
-    _db.session.add(Membership(user_id=member.id, group_id=group.id, role='member'))
-    _db.session.commit()
+    db.session.add(Membership(user_id=member.id, group_id=group.id, role='member'))
+    db.session.commit()
 
     login_user(member.email, member_password)
     response = client.post(f'/groups/{group.id}/leave', follow_redirects=True)
@@ -198,3 +198,19 @@ def test_leave_group_non_member_404(client, user_factory, group_factory, login_u
 
     response = client.post(f'/groups/{group.id}/leave')
     assert response.status_code == 404
+
+
+def test_join_group_case_insensitive_invite_code(client, user_factory, group_factory, login_user):
+    admin, _ = user_factory(email='admin-case@example.com')
+    group = group_factory(creator=admin)
+
+    member, member_password = user_factory(email='member-case@example.com')
+    login_user(member.email, member_password)
+
+    client.post(
+        '/groups/join',
+        data={'invite_code': group.invite_code.lower()},
+        follow_redirects=True,
+    )
+    membership = Membership.query.filter_by(group_id=group.id, user_id=member.id).first()
+    assert membership is not None

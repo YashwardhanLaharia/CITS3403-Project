@@ -1,3 +1,6 @@
+import json
+from decimal import Decimal
+
 from extensions import db as _db
 from models import Expense, ExpenseSplit, Membership
 
@@ -60,9 +63,9 @@ def test_add_custom_splits_respects_amounts(
     expense = Expense.query.filter_by(description='Dinner').first()
     assert expense is not None
     splits_query = ExpenseSplit.query.filter_by(expense_id=expense.id)
-    custom_splits = {split.user_id: float(split.share_amount) for split in splits_query}
-    assert custom_splits[admin.id] == 90.0
-    assert custom_splits[extra_user.id] == 60.0
+    custom_splits = {split.user_id: split.share_amount for split in splits_query}
+    assert custom_splits[admin.id] == Decimal('90.00')
+    assert custom_splits[extra_user.id] == Decimal('60.00')
 
 
 def test_custom_split_validation_fails_when_totals_mismatch(
@@ -126,7 +129,7 @@ def test_add_expense_returns_404_for_non_member(client, user_factory, group_fact
     assert response.status_code == 404
 
 
-def test_add_expense_missing_description_validation(client, user_factory, group_factory, login_user, app):
+def test_add_expense_missing_description_validation(client, user_factory, group_factory, login_user):
     admin, password = user_factory(email='admin-desc@example.com')
     group = group_factory(creator=admin)
     login_user(admin.email, password)
@@ -141,12 +144,10 @@ def test_add_expense_missing_description_validation(client, user_factory, group_
         follow_redirects=True,
     )
     assert b'description' in response.data.lower()
-    with app.app_context():
-        expense = Expense.query.filter_by(group_id=group.id, description='').first()
-        assert expense is None
+    assert Expense.query.filter_by(group_id=group.id, description='').first() is None
 
 
-def test_add_expense_missing_amount_validation(client, user_factory, group_factory, login_user, app):
+def test_add_expense_missing_amount_validation(client, user_factory, group_factory, login_user):
     admin, password = user_factory(email='admin-amt@example.com')
     group = group_factory(creator=admin)
     login_user(admin.email, password)
@@ -161,12 +162,10 @@ def test_add_expense_missing_amount_validation(client, user_factory, group_facto
         follow_redirects=True,
     )
     assert b'amount' in response.data.lower()
-    with app.app_context():
-        expense = Expense.query.filter_by(group_id=group.id, description='Test Expense').first()
-        assert expense is None
+    assert Expense.query.filter_by(group_id=group.id, description='Test Expense').first() is None
 
 
-def test_add_expense_invalid_amount_negative(client, user_factory, group_factory, login_user, app):
+def test_add_expense_invalid_amount_negative(client, user_factory, group_factory, login_user):
     admin, password = user_factory(email='admin-neg@example.com')
     group = group_factory(creator=admin)
     login_user(admin.email, password)
@@ -181,12 +180,10 @@ def test_add_expense_invalid_amount_negative(client, user_factory, group_factory
         follow_redirects=True,
     )
     assert b'positive' in response.data.lower()
-    with app.app_context():
-        expense = Expense.query.filter_by(group_id=group.id, description='Negative').first()
-        assert expense is None
+    assert Expense.query.filter_by(group_id=group.id, description='Negative').first() is None
 
 
-def test_add_expense_invalid_amount_zero(client, user_factory, group_factory, login_user, app):
+def test_add_expense_invalid_amount_zero(client, user_factory, group_factory, login_user):
     admin, password = user_factory(email='admin-zero@example.com')
     group = group_factory(creator=admin)
     login_user(admin.email, password)
@@ -201,9 +198,7 @@ def test_add_expense_invalid_amount_zero(client, user_factory, group_factory, lo
         follow_redirects=True,
     )
     assert b'positive' in response.data.lower()
-    with app.app_context():
-        expense = Expense.query.filter_by(group_id=group.id, description='Zero').first()
-        assert expense is None
+    assert Expense.query.filter_by(group_id=group.id, description='Zero').first() is None
 
 
 def test_add_expense_non_numeric_amount(client, user_factory, group_factory, login_user):
@@ -304,7 +299,7 @@ def test_add_expense_creates_expense_with_correct_fields(client, user_factory, g
 
     expense = Expense.query.filter_by(description='Taxi').first()
     assert expense is not None
-    assert float(expense.amount) == 25.00
+    assert expense.amount == Decimal('25.00')
     assert expense.category == 'Transport'
     assert expense.paid_by == admin.id
     assert expense.group_id == group.id
@@ -351,7 +346,6 @@ def test_add_expense_ajax_validation_error_returns_json(client, user_factory, gr
 
     assert response.status_code == 400
     assert response.content_type == 'application/json'
-    import json
     data = json.loads(response.data)
     assert data['success'] is False
     assert 'errors' in data
@@ -375,6 +369,5 @@ def test_add_expense_ajax_success_returns_json(client, user_factory, group_facto
 
     assert response.status_code == 200
     assert response.content_type == 'application/json'
-    import json
     data = json.loads(response.data)
     assert data['success'] is True

@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from sqlalchemy.exc import IntegrityError
 from extensions import db
-from models import Expense, ExpenseSplit, Group, Membership, User
+from models import Expense, ExpenseSplit, Group, Membership
 
 
 def test_expense_split_type_default_is_equal(app, user_factory):

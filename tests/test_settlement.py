@@ -1,7 +1,7 @@
 from datetime import date
 
 from extensions import db
-from models import Expense, ExpenseSplit, Group, Membership, User
+from models import Expense, ExpenseSplit, Group, Membership
 from routes.main import _compute_group_data
 
 

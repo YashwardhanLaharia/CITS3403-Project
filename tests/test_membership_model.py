@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
 from extensions import db
-from models import Group, Membership, User
+from models import Group, Membership
 
 
 def test_membership_default_role_is_member(app, user_factory):

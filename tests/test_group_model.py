@@ -1,6 +1,6 @@
 import string
 from extensions import db
-from models import Group, User
+from models import Group
 
 
 def test_generate_invite_code_returns_string(app):
@@ -22,11 +22,8 @@ def test_generate_invite_code_produces_unique_codes(app):
     assert len(set(codes)) == 100
 
 
-def test_generate_invite_code_avoids_existing_codes(app):
-    user = User(email='code-test@example.com', first_name='T', last_name='U')
-    user.set_password('TempPass123!')
-    db.session.add(user)
-    db.session.commit()
+def test_generate_invite_code_avoids_existing_codes(app, user_factory):
+    user, _ = user_factory()
 
     group = Group(
         name='Existing Group',

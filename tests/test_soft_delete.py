@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from extensions import db
-from models import User, Group, Membership, Expense, ExpenseSplit
+from models import User, Membership, Expense, ExpenseSplit
 
 
 def test_soft_delete_sets_status_and_timestamp(app, user_factory):
@@ -25,16 +26,6 @@ def test_soft_deleted_user_is_not_active(app, user_factory):
     db.session.commit()
 
     assert user.is_active is False
-
-
-def test_soft_deleted_user_display_name_shows_badge(app, user_factory):
-    user, _ = user_factory(first_name='Alice', last_name='Smith')
-    assert user.display_name == 'Alice Smith'
-
-    user.status = 'deleted'
-    db.session.commit()
-
-    assert user.display_name == 'Alice Smith (deleted)'
 
 
 def test_soft_deleted_user_cannot_log_in(client, user_factory):
@@ -110,17 +101,4 @@ def test_expense_splits_remain_after_soft_delete(app, user_factory, group_factor
 
     fetched = ExpenseSplit.query.filter_by(user_id=member.id).first()
     assert fetched is not None
-    assert float(fetched.share_amount) == 20.00
-
-
-def test_delete_account_route(client, user_factory, login_user):
-    user, password = user_factory()
-    login_user(user.email, password)
-
-    response = client.post('/profile/delete', data={
-        'delete_password': password,
-    }, follow_redirects=True)
-
-    fetched = db.session.get(User, user.id)
-    assert fetched.status == 'deleted'
-    assert fetched.email is None
+    assert fetched.share_amount == Decimal('20.00')

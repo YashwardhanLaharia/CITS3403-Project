@@ -1,7 +1,7 @@
 import pytest
 from datetime import datetime, timezone
 
-from models import User, Membership
+from models import User
 from extensions import db
 
 
@@ -53,17 +53,6 @@ def test_login_and_logout_flow(client, user_factory):
     assert b'You have been logged out.' in response.data
 
 
-def test_login_requires_valid_credentials(client, user_factory):
-    user, _ = user_factory()
-
-    response = client.post(
-        '/login',
-        data={'email': user.email, 'password': 'wrongpass'},
-        follow_redirects=True,
-    )
-    assert b'Invalid email or password.' in response.data
-
-
 def test_index_requires_login(client):
     response = client.get('/', follow_redirects=False)
     assert response.status_code == 302
@@ -89,20 +78,6 @@ def test_login_with_invalid_credentials(client, user_factory, credential_type, c
         follow_redirects=True,
     )
     assert expected_message.encode() in response.data
-
-
-def test_login_with_deleted_account(client, user_factory):
-    user, password = user_factory()
-    user.status = 'deleted'
-    user.deleted_at = datetime.now(timezone.utc)
-    db.session.commit()
-
-    response = client.post(
-        '/login',
-        data={'email': user.email, 'password': password},
-        follow_redirects=True,
-    )
-    assert b'Invalid email or password.' in response.data
 
 
 def test_logout_rejects_get_requests(client, user_factory, login_user):
@@ -301,15 +276,6 @@ def test_login_loader_rejects_deleted_user(client, user_factory):
     assert b'Invalid email or password' in response.data
 
 
-def test_login_loader_rejects_nonexistent_user(client):
-    response = client.post(
-        '/login',
-        data={'email': 'nonexistent@example.com', 'password': 'anypass'},
-        follow_redirects=True,
-    )
-    assert b'Invalid email or password' in response.data
-
-
 def test_delete_account_requires_password(client, user_factory, login_user):
     user, password = user_factory(email='del-no-pass@example.com')
     login_user(user.email, password)
@@ -320,34 +286,6 @@ def test_delete_account_requires_password(client, user_factory, login_user):
         follow_redirects=True,
     )
     assert b'password is required' in response.data.lower()
-
-
-def test_join_group_case_insensitive_invite_code(client, user_factory, login_user):
-    admin, _ = user_factory(email='admin-case@example.com')
-    from models import Group
-
-    group = Group(
-        name='Case Test',
-        currency='AUD',
-        created_by=admin.id,
-        invite_code='TESTCODE',
-    )
-    db.session.add(group)
-    db.session.flush()
-    admin_membership = Membership(user_id=admin.id, group_id=group.id, role='admin')
-    db.session.add(admin_membership)
-    db.session.commit()
-
-    member, member_password = user_factory(email='member-case@example.com')
-    login_user(member.email, member_password)
-
-    response = client.post(
-        '/groups/join',
-        data={'invite_code': 'testcode'},
-        follow_redirects=True,
-    )
-    membership = Membership.query.filter_by(group_id=group.id, user_id=member.id).first()
-    assert membership is not None
 
 
 def test_signup_duplicate_email_rejected(client):
