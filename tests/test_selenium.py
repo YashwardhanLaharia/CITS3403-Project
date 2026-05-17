@@ -37,7 +37,7 @@ def _login(driver, email, password):
     driver.get(BASE_URL + '/login')
     driver.find_element(By.NAME, 'email').send_keys(email)
     driver.find_element(By.NAME, 'password').send_keys(password)
-    driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
+    driver.find_element(By.CSS_SELECTOR, '.btn-primary-action').click()
     WebDriverWait(driver, 10).until(
         EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Welcome back')
     )
@@ -102,6 +102,7 @@ def driver():
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--window-size=1920,1080')
     d = webdriver.Chrome(options=options)
     d.implicitly_wait(5)
     yield d
@@ -123,7 +124,7 @@ class TestSignup:
         driver.find_element(By.NAME, 'email').send_keys('testuser@example.com')
         driver.find_element(By.NAME, 'password').send_keys('Password123!')
         driver.find_element(By.NAME, 'confirm_password').send_keys('Password123!')
-        driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
+        driver.find_element(By.CSS_SELECTOR, '.btn-primary-action').click()
         WebDriverWait(driver, 10).until(
             EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Welcome back')
         )
@@ -137,7 +138,7 @@ class TestSignup:
         driver.find_element(By.NAME, 'email').send_keys('dupe@example.com')
         driver.find_element(By.NAME, 'password').send_keys('Password123!')
         driver.find_element(By.NAME, 'confirm_password').send_keys('Password123!')
-        driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
+        driver.find_element(By.CSS_SELECTOR, '.btn-primary-action').click()
         WebDriverWait(driver, 10).until(
             EC.text_to_be_present_in_element(
                 (By.TAG_NAME, 'body'), 'An account with this email already exists'
@@ -153,7 +154,7 @@ class TestSignup:
         driver.find_element(By.NAME, 'email').send_keys('mismatch@example.com')
         driver.find_element(By.NAME, 'password').send_keys('Password123!')
         driver.find_element(By.NAME, 'confirm_password').send_keys('DifferentPass!')
-        driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
+        driver.find_element(By.CSS_SELECTOR, '.btn-primary-action').click()
         WebDriverWait(driver, 10).until(
             EC.text_to_be_present_in_element(
                 (By.TAG_NAME, 'body'), 'Passwords do not match'
@@ -180,7 +181,7 @@ class TestLogin:
         driver.get(BASE_URL + '/login')
         driver.find_element(By.NAME, 'email').send_keys('wrongpw@example.com')
         driver.find_element(By.NAME, 'password').send_keys('WrongPassword!')
-        driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
+        driver.find_element(By.CSS_SELECTOR, '.btn-primary-action').click()
         WebDriverWait(driver, 10).until(
             EC.text_to_be_present_in_element(
                 (By.TAG_NAME, 'body'), 'Invalid email or password'
@@ -229,11 +230,48 @@ class TestGroups:
 
     def test_join_group_valid_code(self, app, driver):
         """Enter a valid invite code, submit, verify membership."""
-        pytest.skip("not implemented")
+        with app.app_context():
+            user = User(email='joiner@example.com', first_name='Join', last_name='Test')
+            user.set_password('Password123!')
+            _db.session.add(user)
+            _db.session.flush()
+            owner = User(email='owner@example.com', first_name='Owner', last_name='Test')
+            owner.set_password('Password123!')
+            _db.session.add(owner)
+            _db.session.flush()
+            group = Group(
+                name='Trip Group',
+                currency='AUD',
+                invite_code='TESTCODE',
+                created_by=owner.id
+            )
+            _db.session.add(group)
+            _db.session.flush()
+            _db.session.add(Membership(
+                user_id=owner.id, group_id=group.id, role='admin'
+            ))
+            _db.session.commit()
+
+        _login(driver, 'joiner@example.com', 'Password123!')
+        driver.find_element(By.NAME, 'invite_code').send_keys('TESTCODE')
+        driver.find_element(By.CSS_SELECTOR, '.btn-join').click()
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element(
+                (By.TAG_NAME, 'body'), 'You have joined'
+            )
+        )
 
     def test_join_group_invalid_code(self, app, driver):
         """Enter a bogus invite code, verify error flash."""
-        pytest.skip("not implemented")
+        _seed_user(app, email='badcode@example.com', first='Bad', last='Code')
+        _login(driver, 'badcode@example.com', 'Password123!')
+        driver.find_element(By.NAME, 'invite_code').send_keys('XXXXXXXX')
+        driver.find_element(By.CSS_SELECTOR, '.btn-join').click()
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element(
+                (By.TAG_NAME, 'body'), 'Invalid invite code'
+            )
+        )
 
     def test_group_dashboard_loads(self, app, driver):
         """Navigate to a group dashboard, verify key sections render:
