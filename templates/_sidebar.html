@@ -6,18 +6,26 @@
 
   <div class="sidebar-section-label">Navigation</div>
   <a href="{{ url_for('main.index') }}" class="nav-item-btn {{ 'active' if active_page == 'home' }}"><i class="bi bi-house"></i> Home</a>
-  {% if group is defined and group %}
-  <a href="{{ url_for('main.group_dashboard', group_id=group.id) }}" class="nav-item-btn {{ 'active' if active_page == 'dashboard' }}"><i class="bi bi-grid-1x2"></i> Dashboard</a>
+
+  {% if sidebar_groups %}
+  <div class="sidebar-section-label" style="margin-top:16px;">Groups</div>
+  <div class="sidebar-groups-list">
+    {% for g in sidebar_groups %}
+    <a href="{{ url_for('main.group_dashboard', group_id=g.id) }}" class="sidebar-group-item {{ 'active' if group is defined and group and group.id == g.id }}">
+      <div class="sidebar-group-name">{{ g.name }}</div>
+      <div class="sidebar-group-meta">
+        {{ g.member_count }} member{{ 's' if g.member_count != 1 }}
+        {% if g.balance != 0 %}
+        <span style="color: {{ 'var(--accent)' if g.balance >= 0 else 'var(--danger)' }}">
+          {{ '+' if g.balance > 0 }}${{ "%.2f"|format(g.balance|abs) }}
+        </span>
+        {% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
   {% endif %}
 
-  <button class="add-expense-btn" data-bs-toggle="modal" data-bs-target="#createGroupModal">
-    <i class="bi bi-people-fill"></i> New Group
-  </button>
-  {% if group is defined and group %}
-  <button class="add-expense-btn" style="margin-top:0.5rem;" data-bs-toggle="modal" data-bs-target="#addExpenseModal">
-    <i class="bi bi-plus-lg"></i> Add Expense
-  </button>
-  {% endif %}
 
   <div class="sidebar-bottom">
     <a href="{{ url_for('main.profile') }}" class="nav-item-btn {{ 'active' if active_page == 'profile' }}"><i class="bi bi-person-circle"></i> Profile</a>

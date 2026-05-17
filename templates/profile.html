@@ -25,8 +25,8 @@
     <div class="form-card" style="max-width:560px;">
       <div class="form-card-title"><i class="bi bi-person-circle"></i> Account Details</div>
 
-        <form method="POST" action="{{ url_for('main.profile') }}">
-         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <form method="POST" action="{{ url_for('main.profile') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <div class="field-row-2 field-group">
           <div>
             <label class="form-label-sm" for="first-name">First Name</label>
@@ -69,9 +69,9 @@
       </form>
     </div>
 
-    <div class="form-card" style="max-width:560px; border-top:2px solid var(--danger);">
-      <div class="form-card-title" style="color:var(--danger);"><i class="bi bi-trash"></i> Delete Account</div>
-      <p class="text-muted" style="margin-bottom:12px;">Deleting your account flags it as deleted but keeps the shared group history intact; the email will be released and the account will be signed out immediately.</p>
+    <div class="form-card" style="max-width:560px; border: 1px solid rgba(255,107,107,0.2);">
+      <div class="form-card-title" style="color:var(--danger);"><i class="bi bi-trash" style="color:var(--danger);"></i> Delete Account</div>
+      <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:14px; line-height:1.6;">Deleting your account flags it as deleted but keeps the shared group history intact. The email will be released and the account will be signed out immediately.</p>
       <form method="POST" action="{{ url_for('main.delete_account') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <div class="field-group">
