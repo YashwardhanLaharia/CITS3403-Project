@@ -790,10 +790,10 @@ def settle(group_id):
 
     offset_applied = 0.0
     for split in sorted(cross_splits_to_settle, key=lambda s: float(s.share_amount)):
-        if offset_applied >= debtor_total:
-            break
-        split.is_paid = True
-        offset_applied += float(split.share_amount)
+        split_amount = float(split.share_amount)
+        if offset_applied + split_amount <= debtor_total:
+            split.is_paid = True
+            offset_applied += split_amount
 
     cash_due = max(debtor_total - offset_applied, 0)
     for split in sorted(splits_to_settle, key=lambda s: float(s.share_amount)):

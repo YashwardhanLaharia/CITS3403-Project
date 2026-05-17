@@ -469,3 +469,49 @@ def test_settle_partial_cross_debt(client, user_factory, group_factory, login_us
 
     assert bob_owes_alice_refresh.is_paid is False  # $50 not fully covered by $25 cash remainder
     assert alice_owes_bob_refresh.is_paid is True   # reciprocal offset applied
+
+
+def test_settle_reciprocal_larger_than_net(client, user_factory, group_factory, login_user):
+    # Bob owes Alice $10, Alice owes Bob $50.
+    # The reciprocal ($50) exceeds debtor_total ($10) so it must NOT be marked paid.
+    # cash_due = max(10 - 0, 0) = 10, which covers Bob's $10 split fully.
+    alice, _ = user_factory(email='alice-recip@example.com')
+    bob, bob_password = user_factory(email='bob-recip@example.com')
+
+    admin, _ = user_factory(email='admin-recip@example.com')
+    group = group_factory(creator=admin)
+
+    db.session.add(Membership(user_id=alice.id, group_id=group.id, role='member'))
+    db.session.add(Membership(user_id=bob.id, group_id=group.id, role='member'))
+    db.session.commit()
+
+    expense1 = Expense(
+        group_id=group.id, paid_by=bob.id, description='Bob paid big',
+        amount=100.00, category='Food', split_type='equal', date=date(2025, 1, 1),
+    )
+    db.session.add(expense1)
+    expense2 = Expense(
+        group_id=group.id, paid_by=alice.id, description='Alice paid small',
+        amount=20.00, category='Food', split_type='equal', date=date(2025, 1, 2),
+    )
+    db.session.add(expense2)
+    db.session.flush()
+
+    alice_owes_bob = ExpenseSplit(expense_id=expense1.id, user_id=alice.id, share_amount=50.00)
+    bob_owes_alice = ExpenseSplit(expense_id=expense2.id, user_id=bob.id, share_amount=10.00)
+    db.session.add(alice_owes_bob)
+    db.session.add(bob_owes_alice)
+    db.session.commit()
+
+    login_user(bob.email, bob_password)
+
+    client.post(
+        f'/groups/{group.id}/settle',
+        data={'debtor_id': bob.id, 'creditor_id': alice.id, 'split_ids': ''},
+        follow_redirects=True,
+    )
+
+    db.session.expire_all()
+
+    assert ExpenseSplit.query.get(bob_owes_alice.id).is_paid is True   # $10 fully covered by cash_due
+    assert ExpenseSplit.query.get(alice_owes_bob.id).is_paid is False  # $50 > debtor_total $10, not marked
