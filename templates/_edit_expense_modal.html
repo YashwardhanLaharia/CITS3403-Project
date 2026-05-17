@@ -1,0 +1,60 @@
+<div class="modal fade" id="editExpenseModal" tabindex="-1" aria-labelledby="editExpenseModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="border-bottom:1px solid var(--border);">
+        <h5 class="modal-title" id="editExpenseModalLabel"><i class="bi bi-pencil"></i> Edit Expense</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="editExpenseForm" method="POST" action="">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-body" style="padding:1.5rem;">
+          <div style="margin-bottom:1rem;">
+            <label class="form-label-sm">Name</label>
+            <input class="form-input" type="text" name="description" id="edit-description" placeholder="e.g. Groceries" required/>
+          </div>
+          <div class="form-row-2">
+            <div>
+              <label class="form-label-sm">Date</label>
+              <input class="form-input" type="date" name="expense_date" id="edit-date"/>
+            </div>
+            <div>
+              <label class="form-label-sm">Category</label>
+              <select class="form-select" name="category" id="edit-category">
+                {% for cat in expense_categories %}
+                <option value="{{ cat }}">{{ cat }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div style="margin-top:1rem;">
+            <label class="form-label-sm">Amount ($)</label>
+            <input class="form-input" type="number" name="amount" id="edit-amount" step="0.01" min="0.01" placeholder="0.00" required/>
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid var(--border);">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn-primary-action">
+            <i class="bi bi-check-lg"></i> Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('editExpenseModal').addEventListener('show.bs.modal', function(event) {
+  const btn = event.relatedTarget;
+  document.getElementById('edit-description').value = btn.getAttribute('data-description');
+  document.getElementById('edit-amount').value = btn.getAttribute('data-amount');
+  document.getElementById('edit-date').value = btn.getAttribute('data-date');
+  const category = btn.getAttribute('data-category');
+  const select = document.getElementById('edit-category');
+  for (let option of select.options) {
+    if (option.value === category) option.selected = true;
+  }
+  const expenseId = btn.getAttribute('data-expense-id');
+  const groupId = window.location.pathname.split('/')[2];
+  document.getElementById('editExpenseForm').action = `/groups/${groupId}/expenses/${expenseId}/edit`;
+});
+</script>
