@@ -245,15 +245,17 @@ def group_dashboard(group_id):
     ).first_or_404()
 
     group = membership.group
-    members_by_id = {m.user_id: m.user for m in Membership.query.filter_by(group_id=group_id).all() if m.user.status == 'active'}
+    members_by_id = {m.user_id: m.user for m in Membership.query.filter_by(group_id=group_id).all()}
     expenses = Expense.query.filter_by(group_id=group_id).order_by(Expense.date.desc()).all()
 
     members, categories, transfers, total_spent = _compute_group_data(members_by_id, expenses)
+    active_members = [m for m in members if members_by_id.get(m['id']).status == 'active']
 
     return render_template(
         'dashboard.html',
         group=group,
         members=members,
+        active_members=active_members,
         expenses=expenses,
         categories=categories,
         transfers=transfers,
@@ -270,7 +272,7 @@ def group_data(group_id):
     ).first_or_404()
 
     group = Group.query.get_or_404(group_id)
-    members_by_id = {m.user_id: m.user for m in Membership.query.filter_by(group_id=group_id).all() if m.user.status == 'active'}
+    members_by_id = {m.user_id: m.user for m in Membership.query.filter_by(group_id=group_id).all()}
     expenses = Expense.query.filter_by(group_id=group_id).order_by(Expense.date.desc()).all()
 
     members, categories, transfers, total_spent = _compute_group_data(members_by_id, expenses)

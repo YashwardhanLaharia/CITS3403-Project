@@ -43,7 +43,7 @@
           </div>
           <div id="customSplitInputs" style="display:none;margin-top:1rem;">
             <label class="form-label-sm">Amount per person</label>
-            {% for member in members %}
+            {% for member in active_members or members %}
             <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">
               <span style="min-width:120px;">{{ member.name }}</span>
               <input class="form-input" type="number" name="split_amount_{{ member.id }}" step="0.01" min="0" placeholder="0.00" style="flex:1;"/>
