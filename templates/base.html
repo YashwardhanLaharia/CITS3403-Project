@@ -19,7 +19,8 @@
         {% for category, message in messages %}
           <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
             {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"
+                    onclick="this.closest('.alert').remove()"></button>
           </div>
         {% endfor %}
       </div>
