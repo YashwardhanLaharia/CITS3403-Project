@@ -57,7 +57,17 @@ def create_app(config_name=None):
                     Expense.group_id == g.id, Expense.paid_by == current_user.id).scalar()
                 fair = db.session.query(func.coalesce(func.sum(ExpenseSplit.share_amount), 0)).join(
                     Expense).filter(Expense.group_id == g.id, ExpenseSplit.user_id == current_user.id).scalar()
-                balance = float(paid) - float(fair)
+                payments_made = float(
+                    db.session.query(func.coalesce(func.sum(Payment.amount), 0))
+                    .filter(Payment.payer_id == current_user.id, Payment.group_id == g.id)
+                    .scalar()
+                )
+                payments_received = float(
+                    db.session.query(func.coalesce(func.sum(Payment.amount), 0))
+                    .filter(Payment.payee_id == current_user.id, Payment.group_id == g.id)
+                    .scalar()
+                )
+                balance = (float(paid) - payments_received) - (float(fair) - payments_made)
                 sidebar_groups.append({
                     'id': g.id,
                     'name': g.name,
