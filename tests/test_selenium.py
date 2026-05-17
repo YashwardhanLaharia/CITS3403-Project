@@ -89,9 +89,27 @@ class TestSignup:
 class TestLogin:
     """Login, logout, and protected page redirects."""
 
-    def test_login_valid_credentials(self):
+    def test_login_valid_credentials(self, live_app, driver):
         """Log in with a registered user, verify we land on the home page."""
-        pytest.skip("not implemented")
+        from models import User
+        app = create_app('testing')
+        with app.app_context():
+            user = User(
+                email='logintest@example.com',
+                first_name='Login',
+                last_name='Test'
+            )
+            user.set_password('Password123!')
+            _db.session.add(user)
+            _db.session.commit()
+
+        driver.get(live_app + '/login')
+        driver.find_element(By.NAME, 'email').send_keys('logintest@example.com')
+        driver.find_element(By.NAME, 'password').send_keys('Password123!')
+        driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
+        WebDriverWait(driver, 10).until(
+            EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Welcome back')
+        )
 
     def test_login_wrong_password(self):
         """Wrong password shows an error flash, stays on login page."""
