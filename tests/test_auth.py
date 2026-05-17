@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from models import User
+from models import User, Membership
 
 
 def test_signup_validation_errors(client):
@@ -283,3 +283,70 @@ def test_delete_account_with_correct_password_succeeds(client, user_factory, log
     db.session.refresh(user)
     assert user.status == 'deleted'
     assert user.email is None
+
+
+def test_login_loader_rejects_deleted_user(client, user_factory):
+    user, _ = user_factory(email='loader-deleted@example.com')
+    user_email = user.email
+    from extensions import db
+    user.status = 'deleted'
+    user.deleted_at = datetime.now(timezone.utc)
+    user.email = None
+    db.session.commit()
+
+    response = client.post(
+        '/login',
+        data={'email': user_email, 'password': 'anypass'},
+        follow_redirects=True,
+    )
+    assert b'Invalid email or password' in response.data
+
+
+def test_login_loader_rejects_nonexistent_user(client):
+    response = client.post(
+        '/login',
+        data={'email': 'nonexistent@example.com', 'password': 'anypass'},
+        follow_redirects=True,
+    )
+    assert b'Invalid email or password' in response.data
+
+
+def test_delete_account_requires_password(client, user_factory, login_user):
+    user, password = user_factory(email='del-no-pass@example.com')
+    login_user(user.email, password)
+
+    response = client.post(
+        '/profile/delete',
+        data={'delete_password': ''},
+        follow_redirects=True,
+    )
+    assert b'password is required' in response.data.lower()
+
+
+def test_join_group_case_insensitive_invite_code(client, user_factory, login_user):
+    admin, _ = user_factory(email='admin-case@example.com')
+    from models import Group, Membership
+    from extensions import db as _db
+
+    group = Group(
+        name='Case Test',
+        currency='AUD',
+        created_by=admin.id,
+        invite_code='TESTCODE',
+    )
+    _db.session.add(group)
+    _db.session.flush()
+    admin_membership = Membership(user_id=admin.id, group_id=group.id, role='admin')
+    _db.session.add(admin_membership)
+    _db.session.commit()
+
+    member, member_password = user_factory(email='member-case@example.com')
+    login_user(member.email, member_password)
+
+    response = client.post(
+        '/groups/join',
+        data={'invite_code': 'testcode'},
+        follow_redirects=True,
+    )
+    membership = Membership.query.filter_by(group_id=group.id, user_id=member.id).first()
+    assert membership is not None
