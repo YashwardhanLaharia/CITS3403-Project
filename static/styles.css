@@ -549,7 +549,20 @@
     .group-card-meta {
       font-size: 0.78rem;
       color: var(--text-muted);
-      margin-bottom: 14px;
+      margin-bottom: 8px;
+    }
+
+    .group-card-spent {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .group-card-balance {
+      font-size: 0.875rem;
+      font-weight: 600;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
     }
 
     .group-card-footer {
