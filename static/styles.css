@@ -1580,6 +1580,41 @@
       font-size: 0.9rem;
     }
 
+/* ── EXPENSE ACTION BUTTONS ── */
+.btn-expense-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.btn-delete {
+  background: var(--danger-dim);
+  color: var(--danger);
+}
+
+.btn-delete:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn-edit {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.btn-edit:hover {
+  background: var(--accent);
+  color: #0c0f1a;
+}
+
 /* ── RESPONSIVE ── */
 
 .hamburger-btn {

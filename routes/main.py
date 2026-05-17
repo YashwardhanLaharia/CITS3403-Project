@@ -598,6 +598,82 @@ def add_expense(group_id):
     return redirect(url_for('main.group_dashboard', group_id=group_id))
 
 
+@main_bp.route('/groups/<int:group_id>/expenses/<int:expense_id>/edit', methods=['POST'])
+@login_required
+def edit_expense(group_id, expense_id):
+    membership = Membership.query.filter_by(
+        group_id=group_id, user_id=current_user.id
+    ).first_or_404()
+
+    expense = Expense.query.filter_by(id=expense_id, group_id=group_id).first_or_404()
+
+    description = request.form.get('description', '').strip()
+    amount_str = request.form.get('amount', '').strip()
+    category = request.form.get('category', '').strip()
+    date_str = request.form.get('expense_date', '').strip()
+
+    errors = []
+    if not description:
+        errors.append('Description is required.')
+
+    if category not in EXPENSE_CATEGORIES:
+        errors.append('Please select a valid category.')
+
+    expense_date = expense.date
+    if date_str:
+        try:
+            expense_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            errors.append('Invalid date format.')
+
+    amount = None
+    if not amount_str:
+        errors.append('Amount is required.')
+    else:
+        try:
+            amount = float(amount_str)
+            if amount <= 0:
+                errors.append('Amount must be a positive number.')
+        except ValueError:
+            errors.append('Amount must be a valid number.')
+
+    if errors:
+        for e in errors:
+            flash(e, 'error')
+        return redirect(url_for('main.group_dashboard', group_id=group_id))
+
+    expense.description = description
+    expense.amount = amount
+    expense.category = category
+    expense.date = expense_date
+
+    if expense.split_type == 'equal':
+        members = [m for m in Membership.query.filter_by(group_id=group_id).all() if m.user.status == 'active']
+        share = round(amount / len(members), 2)
+        for split in expense.splits:
+            split.share_amount = share
+
+    db.session.commit()
+    flash(f'Expense "{description}" updated successfully!', 'success')
+    return redirect(url_for('main.group_dashboard', group_id=group_id))
+
+
+@main_bp.route('/groups/<int:group_id>/expenses/<int:expense_id>/delete', methods=['POST'])
+@login_required
+def delete_expense(group_id, expense_id):
+    membership = Membership.query.filter_by(
+        group_id=group_id, user_id=current_user.id
+    ).first_or_404()
+
+    expense = Expense.query.filter_by(id=expense_id, group_id=group_id).first_or_404()
+
+    description = expense.description
+    db.session.delete(expense)
+    db.session.commit()
+    flash(f'Expense "{description}" deleted successfully!', 'success')
+    return redirect(url_for('main.group_dashboard', group_id=group_id))
+
+
 @main_bp.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html'), 404
