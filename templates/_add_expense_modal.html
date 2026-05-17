@@ -87,14 +87,18 @@ function updateCustomTotal() {
   document.getElementById('customSplitTotal').textContent = total.toFixed(2);
 }
 
-document.querySelector('input[name="expense_date"]').valueAsDate = new Date();
+const dateInput = document.querySelector('input[name="expense_date"]');
+if (dateInput) dateInput.valueAsDate = new Date();
 
-document.getElementById('addExpenseModal').addEventListener('hidden.bs.modal', function () {
-  this.querySelector('form').reset();
-  document.getElementById('equalSplitInputs').style.display = 'block';
-  document.getElementById('customSplitInputs').style.display = 'none';
-  document.getElementById('customSplitTotal').textContent = '0.00';
-  document.querySelector('input[name="amount"]').setAttribute('required', '');
-  document.querySelector('input[name="expense_date"]').valueAsDate = new Date();
-});
+const modal = document.getElementById('addExpenseModal');
+if (modal) {
+  modal.addEventListener('hidden.bs.modal', function () {
+    this.querySelector('form').reset();
+    document.getElementById('equalSplitInputs').style.display = 'block';
+    document.getElementById('customSplitInputs').style.display = 'none';
+    document.getElementById('customSplitTotal').textContent = '0.00';
+    document.querySelector('input[name="amount"]').setAttribute('required', '');
+    document.querySelector('input[name="expense_date"]').valueAsDate = new Date();
+  });
+}
 </script>
