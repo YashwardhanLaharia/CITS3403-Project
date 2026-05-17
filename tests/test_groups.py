@@ -150,3 +150,51 @@ def test_join_group_requires_login(client):
         follow_redirects=False,
     )
     assert response.status_code == 302
+
+
+def test_leave_group_success(client, user_factory, group_factory, login_user):
+    admin, _ = user_factory(email='admin-leave@example.com')
+    group = group_factory(creator=admin)
+    member, member_password = user_factory(email='member-leave@example.com')
+
+    from extensions import db as _db
+    from models import Membership
+    _db.session.add(Membership(user_id=member.id, group_id=group.id, role='member'))
+    _db.session.commit()
+
+    login_user(member.email, member_password)
+    response = client.post(f'/groups/{group.id}/leave', follow_redirects=True)
+
+    assert b'left the group' in response.data
+    membership = Membership.query.filter_by(user_id=member.id, group_id=group.id).first()
+    assert membership is None
+
+
+def test_leave_group_admin_blocked(client, user_factory, group_factory, login_user):
+    admin, admin_password = user_factory(email='admin-blocked@example.com')
+    group = group_factory(creator=admin)
+    login_user(admin.email, admin_password)
+
+    response = client.post(f'/groups/{group.id}/leave', follow_redirects=True)
+
+    assert b'Admins cannot leave' in response.data
+    membership = Membership.query.filter_by(user_id=admin.id, group_id=group.id).first()
+    assert membership is not None
+
+
+def test_leave_group_requires_login(client, user_factory, group_factory):
+    admin, _ = user_factory(email='admin-logout-leave@example.com')
+    group = group_factory(creator=admin)
+
+    response = client.post(f'/groups/{group.id}/leave', follow_redirects=False)
+    assert response.status_code == 302
+
+
+def test_leave_group_non_member_404(client, user_factory, group_factory, login_user):
+    admin, _ = user_factory(email='admin-nonmember-leave@example.com')
+    group = group_factory(creator=admin)
+    other, other_password = user_factory(email='other-leave@example.com')
+    login_user(other.email, other_password)
+
+    response = client.post(f'/groups/{group.id}/leave')
+    assert response.status_code == 404
