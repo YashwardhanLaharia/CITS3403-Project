@@ -61,12 +61,25 @@ def index():
         .all()
     )
 
+    settled = dict(
+        db.session.query(Expense.group_id, func.coalesce(func.sum(ExpenseSplit.share_amount), 0))
+        .join(ExpenseSplit, ExpenseSplit.expense_id == Expense.id)
+        .filter(
+            Expense.group_id.in_(group_ids),
+            Expense.paid_by == current_user.id,
+            ExpenseSplit.is_paid == True,
+        )
+        .group_by(Expense.group_id)
+        .all()
+    )
+
     groups = []
     net_balance = 0.0
 
     for gid in group_ids:
         group = groups_by_id[gid]
-        user_balance = float(paid_by_user.get(gid, 0)) - float(fair_shares.get(gid, 0))
+        effective_paid = float(paid_by_user.get(gid, 0)) - float(settled.get(gid, 0))
+        user_balance = effective_paid - float(fair_shares.get(gid, 0))
         net_balance += user_balance
 
         groups.append({
