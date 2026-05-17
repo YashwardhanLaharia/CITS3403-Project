@@ -292,3 +292,72 @@ def test_add_expense_creates_expense_with_correct_fields(client, user_factory, g
     assert expense.category == 'Transport'
     assert expense.paid_by == admin.id
     assert expense.group_id == group.id
+
+
+def test_add_expense_custom_split_zero_total(client, user_factory, group_factory, login_user):
+    admin, password = user_factory(email='admin-zero-split@example.com')
+    group = group_factory(creator=admin)
+    extra_user, _ = user_factory(email='member-zero-split@example.com')
+    _db.session.add(Membership(user_id=extra_user.id, group_id=group.id, role='member'))
+    _db.session.commit()
+    login_user(admin.email, password)
+
+    response = client.post(
+        f'/groups/{group.id}/expenses/add',
+        data={
+            'description': 'Zero Split Total',
+            'amount': '50.00',
+            'category': 'Food',
+            'split_type': 'custom',
+            f'split_amount_{admin.id}': '0',
+            f'split_amount_{extra_user.id}': '0',
+        },
+        follow_redirects=True,
+    )
+    assert b'greater than zero' in response.data.lower()
+
+
+def test_add_expense_ajax_validation_error_returns_json(client, user_factory, group_factory, login_user):
+    admin, password = user_factory(email='admin-ajax-err@example.com')
+    group = group_factory(creator=admin)
+    login_user(admin.email, password)
+
+    response = client.post(
+        f'/groups/{group.id}/expenses/add',
+        data={
+            'description': '',
+            'amount': '50.00',
+            'category': 'Food',
+        },
+        headers={'X-Requested-With': 'XMLHttpRequest'},
+    )
+
+    assert response.status_code == 400
+    assert response.content_type == 'application/json'
+    import json
+    data = json.loads(response.data)
+    assert data['success'] is False
+    assert 'errors' in data
+
+
+def test_add_expense_ajax_success_returns_json(client, user_factory, group_factory, login_user):
+    admin, password = user_factory(email='admin-ajax-succ@example.com')
+    group = group_factory(creator=admin)
+    login_user(admin.email, password)
+
+    response = client.post(
+        f'/groups/{group.id}/expenses/add',
+        data={
+            'description': 'Ajax Success',
+            'amount': '30.00',
+            'category': 'Food',
+            'split_type': 'equal',
+        },
+        headers={'X-Requested-With': 'XMLHttpRequest'},
+    )
+
+    assert response.status_code == 200
+    assert response.content_type == 'application/json'
+    import json
+    data = json.loads(response.data)
+    assert data['success'] is True

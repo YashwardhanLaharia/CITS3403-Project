@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from extensions import db as _db
 from models import Expense, ExpenseSplit, Membership
 
@@ -58,3 +60,26 @@ def test_dashboard_summary_displays_balances(
     assert b'Transport' in response.data
     # the group invite code should appear on the dashboard
     assert group.invite_code.encode() in response.data
+
+
+def test_dashboard_renders_with_mixed_member_statuses(
+    client, user_factory, group_factory, login_user
+):
+    admin, password = user_factory(email='admin-del-member@example.com')
+    group = group_factory(creator=admin)
+    deleted_member, _ = user_factory(email='deleted-member@example.com')
+    active_member, _ = user_factory(email='active-member@example.com')
+
+    _db.session.add(Membership(user_id=deleted_member.id, group_id=group.id, role='member'))
+    _db.session.add(Membership(user_id=active_member.id, group_id=group.id, role='member'))
+    _db.session.commit()
+
+    deleted_member.status = 'deleted'
+    deleted_member.deleted_at = datetime.now(timezone.utc)
+    _db.session.commit()
+
+    login_user(admin.email, password)
+    response = client.get(f'/groups/{group.id}')
+
+    assert response.status_code == 200
+    assert b'Member Balances' in response.data
