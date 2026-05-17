@@ -10,7 +10,7 @@ Think share houses, group holidays, dinners out - anywhere a group of people are
 |------|--------|--------|
 | Yashwardhan Laharia | 24295462 | [YashwardhanLaharia](https://github.com/YashwardhanLaharia) |
 | Aman Sohail | 24307949 | [amansohail22](https://github.com/amansohail22) |
-| Stefan Ciu | 24466541 | [stfn-c](https://github.com/stfn-c) |
+| Stefan Ciutina | 24466541 | [stfn-c](https://github.com/stfn-c) |
 
 ## What it does
 
