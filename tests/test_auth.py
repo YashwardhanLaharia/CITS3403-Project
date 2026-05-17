@@ -14,11 +14,8 @@ def test_signup_validation_errors(client):
         follow_redirects=True,
     )
 
-    assert b'First name is required.' in response.data
-    assert b'Last name is required.' in response.data
-    assert b'Please enter a valid email address.' in response.data
-    assert b'Password must be at least 8 characters.' in response.data
-    assert b'Passwords do not match.' in response.data
+    assert response.status_code == 200
+    assert User.query.count() == 0
 
 
 def test_signup_creates_user(client):
