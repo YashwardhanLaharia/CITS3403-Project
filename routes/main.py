@@ -1,6 +1,6 @@
 import re
 from datetime import datetime, date
-from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify, request as flask_request
+from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import func
 from extensions import db, login_manager, limiter
@@ -262,7 +262,7 @@ def group_dashboard(group_id):
 
 
 def get_user_id():
-    return str(current_user.id) if current_user.is_authenticated else flask_request.remote_addr
+    return str(current_user.id)
 
 
 @main_bp.route('/groups/<int:group_id>/data')
