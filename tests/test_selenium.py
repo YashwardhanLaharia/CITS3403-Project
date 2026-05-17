@@ -29,6 +29,32 @@ BASE_URL = 'http://localhost:5001'
 
 
 # ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _login(driver, email, password):
+    """Log in via the browser and wait for the home page."""
+    driver.get(BASE_URL + '/login')
+    driver.find_element(By.NAME, 'email').send_keys(email)
+    driver.find_element(By.NAME, 'password').send_keys(password)
+    driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
+    WebDriverWait(driver, 10).until(
+        EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Welcome back')
+    )
+
+
+def _seed_user(app, email='test@example.com', first='Test', last='User',
+               password='Password123!'):
+    """Create a user in the DB and return the email for login."""
+    with app.app_context():
+        user = User(email=email, first_name=first, last_name=last)
+        user.set_password(password)
+        _db.session.add(user)
+        _db.session.commit()
+    return email
+
+
+# ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
@@ -102,15 +128,15 @@ class TestSignup:
             EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Welcome back')
         )
 
-    def test_signup_duplicate_email(self):
+    def test_signup_duplicate_email(self, app, driver):
         """Register twice with the same email, verify error message shows."""
         pytest.skip("not implemented")
 
-    def test_signup_password_mismatch(self):
+    def test_signup_password_mismatch(self, app, driver):
         """Mismatched confirm password, verify form shows validation error."""
         pytest.skip("not implemented")
 
-    def test_signup_missing_fields(self):
+    def test_signup_missing_fields(self, app, driver):
         """Submit with required fields blank, verify browser validation."""
         pytest.skip("not implemented")
 
@@ -120,51 +146,21 @@ class TestLogin:
 
     def test_login_valid_credentials(self, app, driver):
         """Log in with a registered user, verify we land on the home page."""
-        with app.app_context():
-            user = User(
-                email='logintest@example.com',
-                first_name='Login',
-                last_name='Test'
-            )
-            user.set_password('Password123!')
-            _db.session.add(user)
-            _db.session.commit()
+        _seed_user(app, email='logintest@example.com', first='Login', last='Test')
+        _login(driver, 'logintest@example.com', 'Password123!')
 
-        driver.get(BASE_URL + '/login')
-        driver.find_element(By.NAME, 'email').send_keys('logintest@example.com')
-        driver.find_element(By.NAME, 'password').send_keys('Password123!')
-        driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
-        WebDriverWait(driver, 10).until(
-            EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Welcome back')
-        )
-
-    def test_login_wrong_password(self):
+    def test_login_wrong_password(self, app, driver):
         """Wrong password shows an error flash, stays on login page."""
         pytest.skip("not implemented")
 
-    def test_protected_page_redirects_to_login(self):
+    def test_protected_page_redirects_to_login(self, app, driver):
         """Hitting /profile without auth redirects to /login."""
         pytest.skip("not implemented")
 
     def test_logout(self, app, driver):
         """Log out via sidebar, verify redirect to login page."""
-        with app.app_context():
-            user = User(
-                email='logouttest@example.com',
-                first_name='Logout',
-                last_name='Test'
-            )
-            user.set_password('Password123!')
-            _db.session.add(user)
-            _db.session.commit()
-
-        driver.get(BASE_URL + '/login')
-        driver.find_element(By.NAME, 'email').send_keys('logouttest@example.com')
-        driver.find_element(By.NAME, 'password').send_keys('Password123!')
-        driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
-        WebDriverWait(driver, 10).until(
-            EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Welcome back')
-        )
+        _seed_user(app, email='logouttest@example.com', first='Logout', last='Test')
+        _login(driver, 'logouttest@example.com', 'Password123!')
         driver.find_element(By.CSS_SELECTOR, '.sidebar-bottom form button[type="submit"]').click()
         WebDriverWait(driver, 10).until(
             EC.url_contains('/login')
@@ -181,23 +177,8 @@ class TestGroups:
     def test_create_group(self, app, driver):
         """Open create group modal, fill name + currency, submit,
         verify group appears on home page."""
-        with app.app_context():
-            user = User(
-                email='grouptest@example.com',
-                first_name='Group',
-                last_name='Test'
-            )
-            user.set_password('Password123!')
-            _db.session.add(user)
-            _db.session.commit()
-
-        driver.get(BASE_URL + '/login')
-        driver.find_element(By.NAME, 'email').send_keys('grouptest@example.com')
-        driver.find_element(By.NAME, 'password').send_keys('Password123!')
-        driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
-        WebDriverWait(driver, 10).until(
-            EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Welcome back')
-        )
+        _seed_user(app, email='grouptest@example.com', first='Group', last='Test')
+        _login(driver, 'grouptest@example.com', 'Password123!')
         driver.find_element(By.CSS_SELECTOR, '[data-bs-target="#createGroupModal"]').click()
         WebDriverWait(driver, 10).until(
             EC.visibility_of_element_located((By.ID, 'createGroupModal'))
@@ -209,11 +190,11 @@ class TestGroups:
             EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Sydney Trip')
         )
 
-    def test_join_group_valid_code(self):
+    def test_join_group_valid_code(self, app, driver):
         """Enter a valid invite code, submit, verify membership."""
         pytest.skip("not implemented")
 
-    def test_join_group_invalid_code(self):
+    def test_join_group_invalid_code(self, app, driver):
         """Enter a bogus invite code, verify error flash."""
         pytest.skip("not implemented")
 
@@ -237,22 +218,13 @@ class TestGroups:
             )
             _db.session.add(group)
             _db.session.flush()
-            membership = Membership(
-                user_id=user.id,
-                group_id=group.id,
-                role='admin'
-            )
-            _db.session.add(membership)
+            _db.session.add(Membership(
+                user_id=user.id, group_id=group.id, role='admin'
+            ))
             _db.session.commit()
             group_id = group.id
 
-        driver.get(BASE_URL + '/login')
-        driver.find_element(By.NAME, 'email').send_keys('dashtest@example.com')
-        driver.find_element(By.NAME, 'password').send_keys('Password123!')
-        driver.find_element(By.CSS_SELECTOR, 'form button[type="submit"]').click()
-        WebDriverWait(driver, 10).until(
-            EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Welcome back')
-        )
+        _login(driver, 'dashtest@example.com', 'Password123!')
         driver.get(BASE_URL + f'/groups/{group_id}')
         WebDriverWait(driver, 10).until(
             EC.text_to_be_present_in_element((By.TAG_NAME, 'body'), 'Member Balances')
@@ -268,22 +240,22 @@ class TestGroups:
 class TestExpenses:
     """Adding expenses through the modal (AJAX submission)."""
 
-    def test_add_equal_split_expense(self):
+    def test_add_equal_split_expense(self, app, driver):
         """Open expense modal, fill details with equal split, submit,
         verify expense appears in recent activity without page reload."""
         pytest.skip("not implemented")
 
-    def test_add_custom_split_expense(self):
+    def test_add_custom_split_expense(self, app, driver):
         """Toggle to custom split, enter per-member amounts, submit,
         verify amounts are correct in the dashboard."""
         pytest.skip("not implemented")
 
-    def test_expense_validation_rejects_empty(self):
+    def test_expense_validation_rejects_empty(self, app, driver):
         """Submit modal with no description/amount, verify error shows
         inside the modal (not a page redirect)."""
         pytest.skip("not implemented")
 
-    def test_expense_updates_balances(self):
+    def test_expense_updates_balances(self, app, driver):
         """After adding an expense, verify the member balance cards
         update to reflect the new totals."""
         pytest.skip("not implemented")
@@ -296,11 +268,11 @@ class TestExpenses:
 class TestProfile:
     """Profile viewing and editing."""
 
-    def test_profile_displays_user_info(self):
+    def test_profile_displays_user_info(self, app, driver):
         """Navigate to profile, verify name and email are populated."""
         pytest.skip("not implemented")
 
-    def test_profile_update_name(self):
+    def test_profile_update_name(self, app, driver):
         """Change first name, enter current password, submit, verify
         the updated name shows on reload."""
         pytest.skip("not implemented")
@@ -313,12 +285,12 @@ class TestProfile:
 class TestNavigation:
     """Sidebar, hamburger menu, and page transitions."""
 
-    def test_sidebar_links_navigate(self):
+    def test_sidebar_links_navigate(self, app, driver):
         """Click Home and Dashboard in the sidebar, verify correct
         pages load."""
         pytest.skip("not implemented")
 
-    def test_hamburger_menu_on_mobile(self):
+    def test_hamburger_menu_on_mobile(self, app, driver):
         """Resize viewport to mobile width, verify hamburger button
         appears and toggles the sidebar."""
         pytest.skip("not implemented")
