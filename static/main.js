@@ -94,13 +94,6 @@ function renderSettlement(transfers) {
   const currentUserId = window.CURRENT_USER_ID;
   preview.innerHTML = transfers.map(t => {
     const isDebtor = currentUserId === t.debtor_id;
-    const splitsHtml = isDebtor && t.splits?.length
-      ? `<div style="margin-top:8px;font-size:0.85em;">
-          ${t.splits.map(s => `<label style="display:block;margin:4px 0;">
-            <input type="checkbox" name="split_ids" value="${s.id}"> ${esc(s.description)} - $${s.amount.toFixed(2)}
-          </label>`).join('')}
-        </div>`
-      : '';
     if (isDebtor) {
       return `
       <div class="archived-card">
@@ -108,15 +101,19 @@ function renderSettlement(transfers) {
           <input type="hidden" name="csrf_token" value="${csrfToken}">
           <input type="hidden" name="debtor_id" value="${t.debtor_id}">
           <input type="hidden" name="creditor_id" value="${t.creditor_id}">
-          <input type="hidden" name="split_ids" value="">
           <div style="flex:1;">
             <div class="archived-name">${esc(t.from)} &rarr; ${esc(t.to)}</div>
-            <div class="archived-meta">$${t.amount.toFixed(2)}</div>
-            ${splitsHtml}
+            <div class="archived-meta">owes $${t.amount.toFixed(2)}</div>
           </div>
-          <button type="submit" class="btn-expense-action btn-edit settle-btn">
-            <i class="bi bi-check-circle"></i> Mark as Paid
-          </button>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+            <input type="number" name="payment_amount"
+                   step="0.01" min="0.01" max="${t.amount.toFixed(2)}"
+                   value="${t.amount.toFixed(2)}"
+                   style="width:90px;padding:4px 8px;font-size:0.85rem;">
+            <button type="submit" class="btn-expense-action btn-edit settle-btn">
+              <i class="bi bi-check-circle"></i> Pay
+            </button>
+          </div>
         </form>
       </div>`;
     }
@@ -134,14 +131,11 @@ function renderSettlement(transfers) {
 
 function bindSettleForms() {
   document.querySelectorAll('.settle-form').forEach(form => {
-    form.addEventListener('submit', function(e) {
+    form.addEventListener('submit', function() {
       const groupId = document.querySelector('.main-content')?.dataset.groupId;
       if (groupId) {
         this.action = `/groups/${groupId}/settle`;
       }
-      const checkboxes = this.querySelectorAll('input[name="split_ids"]:checked');
-      const splitIds = Array.from(checkboxes).map(cb => cb.value);
-      this.querySelector('input[name="split_ids"]').value = splitIds.join(',');
     });
   });
 }

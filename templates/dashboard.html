@@ -180,23 +180,23 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="debtor_id" value="{{ t.debtor_id }}">
             <input type="hidden" name="creditor_id" value="{{ t.creditor_id }}">
-            <input type="hidden" name="split_ids" value="">
             <div style="flex:1;">
               <div class="archived-name">{{ t.from_name }} → {{ t.to_name }}</div>
-              <div class="archived-meta">${{ "%.2f"|format(t.amount) }}</div>
-              {% if t.splits %}
-              <div style="margin-top:8px;font-size:0.85em;">
-                {% for s in t.splits %}
-                <label style="display:block;margin:4px 0;">
-                  <input type="checkbox" name="split_ids" value="{{ s.id }}"> {{ s.description }} - ${{ "%.2f"|format(s.amount) }}
-                </label>
-                {% endfor %}
-              </div>
-              {% endif %}
+              <div class="archived-meta">owes ${{ "%.2f"|format(t.amount) }}</div>
             </div>
-            <button type="submit" class="btn-expense-action btn-edit settle-btn">
-              <i class="bi bi-check-circle"></i> Mark as Paid
-            </button>
+            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+              <input type="number"
+                     name="payment_amount"
+                     class="form-input"
+                     step="0.01"
+                     min="0.01"
+                     max="{{ '%.2f'|format(t.amount) }}"
+                     value="{{ '%.2f'|format(t.amount) }}"
+                     style="width:90px;padding:4px 8px;font-size:0.85rem;">
+              <button type="submit" class="btn-expense-action btn-edit settle-btn">
+                <i class="bi bi-check-circle"></i> Pay
+              </button>
+            </div>
           </form>
           {% else %}
           <div style="flex:1;">
