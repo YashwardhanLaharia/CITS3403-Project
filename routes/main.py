@@ -794,17 +794,16 @@ def settle(group_id):
     if remaining > 0:
         for split in splits_to_settle:
             split_amount = float(split.share_amount)
-            if remaining <= split_amount:
-                remaining = 0
-                break
             split.is_paid = True
+            if remaining <= split_amount:
+                break
             remaining -= split_amount
     elif remaining < 0:
         for split in cross_splits_to_settle:
             split_amount = float(split.share_amount)
+            split.is_paid = True
             if abs(remaining) <= split_amount:
                 break
-            split.is_paid = True
             remaining += split_amount
 
     db.session.commit()

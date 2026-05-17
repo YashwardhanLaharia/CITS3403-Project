@@ -101,23 +101,31 @@ function renderSettlement(transfers) {
           </label>`).join('')}
         </div>`
       : '';
+    if (isDebtor) {
+      return `
+      <div class="archived-card">
+        <form method="POST" action="" style="margin:0;display:flex;align-items:center;width:100%;gap:12px;" class="settle-form">
+          <input type="hidden" name="csrf_token" value="${csrfToken}">
+          <input type="hidden" name="debtor_id" value="${t.debtor_id}">
+          <input type="hidden" name="creditor_id" value="${t.creditor_id}">
+          <input type="hidden" name="split_ids" value="">
+          <div style="flex:1;">
+            <div class="archived-name">${esc(t.from)} &rarr; ${esc(t.to)}</div>
+            <div class="archived-meta">$${t.amount.toFixed(2)}</div>
+            ${splitsHtml}
+          </div>
+          <button type="submit" class="btn-expense-action btn-edit settle-btn">
+            <i class="bi bi-check-circle"></i> Mark as Paid
+          </button>
+        </form>
+      </div>`;
+    }
     return `
     <div class="archived-card">
       <div style="flex:1;">
         <div class="archived-name">${esc(t.from)} &rarr; ${esc(t.to)}</div>
         <div class="archived-meta">$${t.amount.toFixed(2)}</div>
-        ${splitsHtml}
       </div>
-      ${isDebtor ? `
-        <form method="POST" action="" style="margin:0;" class="settle-form" data-group-id>
-          <input type="hidden" name="csrf_token" value="${csrfToken}">
-          <input type="hidden" name="debtor_id" value="${t.debtor_id}">
-          <input type="hidden" name="creditor_id" value="${t.creditor_id}">
-          <input type="hidden" name="split_ids" value="">
-          <button type="submit" class="btn-expense-action btn-edit settle-btn">
-            <i class="bi bi-check-circle"></i> Mark as Paid
-          </button>
-        </form>` : ''}
     </div>`;
   }).join('');
 
