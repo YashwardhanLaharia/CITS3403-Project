@@ -366,6 +366,9 @@ def group_data(group_id):
                 'from': t['from_name'],
                 'to': t['to_name'],
                 'amount': t['amount'],
+                'debtor_id': t['debtor_id'],
+                'creditor_id': t['creditor_id'],
+                'splits': t.get('splits', []),
             }
             for t in transfers
         ],

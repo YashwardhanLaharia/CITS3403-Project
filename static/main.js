@@ -90,14 +90,48 @@ function renderSettlement(transfers) {
       </div>`;
     return;
   }
-  preview.innerHTML = transfers.map(t => `
+  const csrfToken = document.querySelector('input[name="csrf_token"]')?.value || '';
+  const currentUserId = window.CURRENT_USER_ID;
+  preview.innerHTML = transfers.map(t => {
+    const isDebtor = currentUserId === t.debtor_id;
+    const splitsHtml = isDebtor && t.splits?.length
+      ? `<div style="margin-top:8px;font-size:0.85em;">
+          ${t.splits.map(s => `<label style="display:block;margin:4px 0;">
+            <input type="checkbox" name="split_ids" value="${s.id}"> ${esc(s.description)} - $${s.amount.toFixed(2)}
+          </label>`).join('')}
+        </div>`
+      : '';
+    return `
     <div class="archived-card">
-      <div class="archived-icon"><i class="bi bi-arrow-right-circle"></i></div>
-      <div>
+      <div style="flex:1;">
         <div class="archived-name">${esc(t.from)} &rarr; ${esc(t.to)}</div>
         <div class="archived-meta">$${t.amount.toFixed(2)}</div>
+        ${splitsHtml}
       </div>
-    </div>`).join('');
+      ${isDebtor ? `
+        <form method="POST" action="" style="margin:0;" class="settle-form" data-group-id>
+          <input type="hidden" name="csrf_token" value="${csrfToken}">
+          <input type="hidden" name="debtor_id" value="${t.debtor_id}">
+          <input type="hidden" name="creditor_id" value="${t.creditor_id}">
+          <input type="hidden" name="split_ids" value="">
+          <button type="submit" class="btn-expense-action btn-edit settle-btn">
+            <i class="bi bi-check-circle"></i> Mark as Paid
+          </button>
+        </form>` : ''}
+    </div>`;
+  }).join('');
+
+  document.querySelectorAll('.settle-form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+      const groupId = document.querySelector('.main-content')?.dataset.groupId;
+      if (groupId) {
+        this.action = `/groups/${groupId}/settle`;
+      }
+      const checkboxes = this.querySelectorAll('input[name="split_ids"]:checked');
+      const splitIds = Array.from(checkboxes).map(cb => cb.value);
+      this.querySelector('input[name="split_ids"]').value = splitIds.join(',');
+    });
+  });
 }
 
 function renderGroupSummary(group, memberCount) {
