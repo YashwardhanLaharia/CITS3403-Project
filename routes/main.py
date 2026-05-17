@@ -1,5 +1,6 @@
 import re
 import secrets
+from decimal import Decimal, ROUND_DOWN
 from urllib.parse import urlparse
 from datetime import datetime, date, timezone
 from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
@@ -51,7 +52,10 @@ def index():
     )
 
     fair_shares = dict(
-        db.session.query(Expense.group_id, func.coalesce(func.sum(ExpenseSplit.share_amount), 0))
+        db.session.query(
+            Expense.group_id,
+            func.coalesce(func.sum(ExpenseSplit.share_amount - ExpenseSplit.paid_amount), 0)
+        )
         .join(ExpenseSplit, ExpenseSplit.expense_id == Expense.id)
         .filter(
             Expense.group_id.in_(group_ids),
@@ -63,12 +67,12 @@ def index():
     )
 
     settled = dict(
-        db.session.query(Expense.group_id, func.coalesce(func.sum(ExpenseSplit.share_amount), 0))
+        db.session.query(Expense.group_id, func.coalesce(func.sum(ExpenseSplit.paid_amount), 0))
         .join(ExpenseSplit, ExpenseSplit.expense_id == Expense.id)
         .filter(
             Expense.group_id.in_(group_ids),
             Expense.paid_by == current_user.id,
-            ExpenseSplit.is_paid == True,
+            ExpenseSplit.paid_amount > 0,
         )
         .group_by(Expense.group_id)
         .all()
@@ -213,10 +217,16 @@ def _compute_group_data(members_by_id, expenses):
         cat = expense.category or 'Other'
         category_totals[cat] = category_totals.get(cat, 0.0) + amount
         for split in expense.splits:
-            if split.is_paid:
+            remaining = float(split.share_amount - split.paid_amount)
+            if remaining <= 0:
+                # Fully settled: reduce what the creditor is owed
                 paid_totals[expense.paid_by] = paid_totals.get(expense.paid_by, 0.0) - float(split.share_amount)
             else:
-                share_totals[split.user_id] = share_totals.get(split.user_id, 0.0) + float(split.share_amount)
+                # Partially or fully unpaid: count remaining obligation
+                share_totals[split.user_id] = share_totals.get(split.user_id, 0.0) + remaining
+                # Credit the portion already paid back to the payer
+                if split.paid_amount > 0:
+                    paid_totals[expense.paid_by] = paid_totals.get(expense.paid_by, 0.0) - float(split.paid_amount)
 
     members = [
         {
@@ -234,7 +244,6 @@ def _compute_group_data(members_by_id, expenses):
         for cat, amount in sorted(category_totals.items(), key=lambda x: -x[1])
     ]
 
-    # Greedy settlement: repeatedly match largest debtor with largest creditor
     raw_balances = {uid: paid_totals.get(uid, 0.0) - share_totals.get(uid, 0.0)
                     for uid in members_by_id}
     creditors = [[uid, bal] for uid, bal in sorted(raw_balances.items(), key=lambda x: -x[1]) if bal > 0.005]
@@ -352,6 +361,8 @@ def group_data(group_id):
                 'from': t['from_name'],
                 'to': t['to_name'],
                 'amount': t['amount'],
+                'debtor_id': t['debtor_id'],
+                'creditor_id': t['creditor_id'],
             }
             for t in transfers
         ],
@@ -753,14 +764,64 @@ def settle(group_id):
         flash('No outstanding splits found.', 'error')
         return redirect(url_for('main.group_dashboard', group_id=group_id))
 
-    for split in splits:
-        split.is_paid = True
+    # Total remaining balance owed by debtor to creditor (ceiling for payment).
+    # Uses remaining_amount (share_amount - paid_amount) to account for prior
+    # partial payments.
+    total_unpaid = sum(s.remaining_amount for s in splits)
 
-    for split in cross_splits:
-        split.is_paid = True
+    if total_unpaid <= 0 and not cross_splits:
+        flash('No outstanding splits found.', 'error')
+        return redirect(url_for('main.group_dashboard', group_id=group_id))
+
+    # Read optional partial payment amount from the form.
+    payment_amount_raw = request.form.get('payment_amount', '').strip()
+    if payment_amount_raw:
+        try:
+            payment_amount = Decimal(payment_amount_raw).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
+        except Exception:
+            flash('Invalid payment amount.', 'error')
+            return redirect(url_for('main.group_dashboard', group_id=group_id))
+        if payment_amount <= 0:
+            flash('Payment amount must be greater than zero.', 'error')
+            return redirect(url_for('main.group_dashboard', group_id=group_id))
+        if payment_amount > total_unpaid:
+            flash('Payment amount exceeds outstanding balance.', 'error')
+            return redirect(url_for('main.group_dashboard', group_id=group_id))
+        debtor_total = payment_amount
+    else:
+        # No amount specified — settle everything.
+        debtor_total = total_unpaid
+
+    # Cross-debt offset: walk creditor's remaining splits (smallest first) and
+    # cancel them against debtor_total without any cash changing hands.
+    offset_applied = Decimal('0')
+    for split in sorted(cross_splits, key=lambda s: s.remaining_amount):
+        split_remaining = split.remaining_amount
+        if offset_applied + split_remaining <= debtor_total:
+            split.paid_amount = split.share_amount
+            split.is_paid = True
+            offset_applied += split_remaining
+
+    # Cash remainder: apply cash to debtor's own splits smallest-first.
+    # Each split gets its paid_amount incremented; is_paid is set only when
+    # the split is fully covered.
+    cash_due = max(debtor_total - offset_applied, Decimal('0'))
+    for split in sorted(splits, key=lambda s: s.remaining_amount):
+        if cash_due <= 0:
+            break
+        split_remaining = split.remaining_amount
+        if cash_due >= split_remaining:
+            # Fully covers this split
+            split.paid_amount = split.share_amount
+            split.is_paid = True
+            cash_due -= split_remaining
+        else:
+            # Partial payment — record progress, leave is_paid False
+            split.paid_amount += cash_due
+            cash_due = Decimal('0')
 
     db.session.commit()
-    flash('Settlement marked as paid.', 'success')
+    flash(f'Payment of ${debtor_total:.2f} recorded.', 'success')
     return redirect(url_for('main.group_dashboard', group_id=group_id))
 
 

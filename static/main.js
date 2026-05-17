@@ -90,14 +90,54 @@ function renderSettlement(transfers) {
       </div>`;
     return;
   }
-  preview.innerHTML = transfers.map(t => `
+  const csrfToken = document.querySelector('input[name="csrf_token"]')?.value || '';
+  const currentUserId = window.CURRENT_USER_ID;
+  preview.innerHTML = transfers.map(t => {
+    const isDebtor = currentUserId === t.debtor_id;
+    if (isDebtor) {
+      return `
+      <div class="archived-card">
+        <form method="POST" action="" style="margin:0;display:flex;align-items:center;width:100%;gap:12px;" class="settle-form">
+          <input type="hidden" name="csrf_token" value="${csrfToken}">
+          <input type="hidden" name="debtor_id" value="${t.debtor_id}">
+          <input type="hidden" name="creditor_id" value="${t.creditor_id}">
+          <div style="flex:1;">
+            <div class="archived-name">${esc(t.from)} &rarr; ${esc(t.to)}</div>
+            <div class="archived-meta">owes $${t.amount.toFixed(2)}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+            <input type="number" name="payment_amount"
+                   step="0.01" min="0.01" max="${t.amount.toFixed(2)}"
+                   value="${t.amount.toFixed(2)}"
+                   style="width:90px;padding:4px 8px;font-size:0.85rem;">
+            <button type="submit" class="btn-expense-action btn-edit settle-btn">
+              <i class="bi bi-check-circle"></i> Pay
+            </button>
+          </div>
+        </form>
+      </div>`;
+    }
+    return `
     <div class="archived-card">
-      <div class="archived-icon"><i class="bi bi-arrow-right-circle"></i></div>
-      <div>
+      <div style="flex:1;">
         <div class="archived-name">${esc(t.from)} &rarr; ${esc(t.to)}</div>
         <div class="archived-meta">$${t.amount.toFixed(2)}</div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+
+  bindSettleForms();
+}
+
+function bindSettleForms() {
+  document.querySelectorAll('.settle-form').forEach(form => {
+    form.addEventListener('submit', function() {
+      const groupId = document.querySelector('.main-content')?.dataset.groupId;
+      if (groupId) {
+        this.action = `/groups/${groupId}/settle`;
+      }
+    });
+  });
 }
 
 function renderGroupSummary(group, memberCount) {
@@ -108,6 +148,8 @@ function renderGroupSummary(group, memberCount) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  bindSettleForms();
+
   const form = document.getElementById('addExpenseForm');
   if (!form) return;
 

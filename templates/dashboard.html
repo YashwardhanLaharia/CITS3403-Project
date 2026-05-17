@@ -2,7 +2,8 @@
 {% block title_suffix %} – {{ group.name if group else 'Dashboard' }}{% endblock %}
 
 {% block body %}
-<div class="main-content">
+<script>window.CURRENT_USER_ID = {{ current_user.id }};</script>
+<div class="main-content" data-group-id="{{ group.id if group else '' }}">
 
   <nav class="topnav">
     <button class="hamburger-btn" id="hamburger-btn" aria-label="Open menu">
@@ -183,19 +184,34 @@
       {% if transfers %}
         {% for t in transfers %}
         <div class="archived-card">
+          {% if current_user.id == t.debtor_id %}
+          <form method="POST" action="/groups/{{ group.id }}/settle" style="margin:0;display:flex;align-items:center;width:100%;gap:12px;" class="settle-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="debtor_id" value="{{ t.debtor_id }}">
+            <input type="hidden" name="creditor_id" value="{{ t.creditor_id }}">
+            <div style="flex:1;">
+              <div class="archived-name">{{ t.from_name }} → {{ t.to_name }}</div>
+              <div class="archived-meta">owes ${{ "%.2f"|format(t.amount) }}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+              <input type="number"
+                     name="payment_amount"
+                     class="form-input"
+                     step="0.01"
+                     min="0.01"
+                     max="{{ '%.2f'|format(t.amount) }}"
+                     value="{{ '%.2f'|format(t.amount) }}"
+                     style="width:90px;padding:4px 8px;font-size:0.85rem;">
+              <button type="submit" class="btn-expense-action btn-edit settle-btn">
+                <i class="bi bi-check-circle"></i> Pay
+              </button>
+            </div>
+          </form>
+          {% else %}
           <div style="flex:1;">
             <div class="archived-name">{{ t.from_name }} → {{ t.to_name }}</div>
             <div class="archived-meta">${{ "%.2f"|format(t.amount) }}</div>
           </div>
-          {% if current_user.id == t.debtor_id %}
-          <form method="POST" action="/groups/{{ group.id }}/settle" style="margin:0;">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="debtor_id" value="{{ t.debtor_id }}">
-            <input type="hidden" name="creditor_id" value="{{ t.creditor_id }}">
-            <button type="submit" class="btn-expense-action btn-edit">
-              <i class="bi bi-check-circle"></i> Mark as Paid
-            </button>
-          </form>
           {% endif %}
         </div>
         {% endfor %}

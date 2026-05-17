@@ -120,6 +120,7 @@ class ExpenseSplit(db.Model):
     expense_id = db.Column(db.Integer, db.ForeignKey('expenses.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     share_amount = db.Column(db.Numeric(10, 2), nullable=False)
+    paid_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0, server_default='0')
     is_paid = db.Column(db.Boolean, default=False)
 
     expense = db.relationship('Expense', back_populates='splits')
@@ -128,6 +129,11 @@ class ExpenseSplit(db.Model):
     __table_args__ = (
         db.UniqueConstraint('expense_id', 'user_id', name='unique_expense_user_split'),
     )
+
+    @property
+    def remaining_amount(self):
+        """Amount still owed after partial payments."""
+        return self.share_amount - self.paid_amount
 
     def __repr__(self):
         return f'<ExpenseSplit expense_id={self.expense_id} user_id={self.user_id} amount={self.share_amount}>'

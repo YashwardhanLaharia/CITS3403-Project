@@ -290,3 +290,418 @@ def test_compute_group_data_three_member_settlement(app, user_factory):
     assert u1_data['balance'] == 60.00
     assert u2_data['balance'] == -30.00
     assert u3_data['balance'] == -30.00
+
+
+def test_settle_selective_splits(client, user_factory, group_factory, login_user):
+    # Paying exactly split1's amount ($25) should cover split1 but leave split2 ($15)
+    # untouched, because the greedy loop marks splits smallest-first and $25 < $25+$15.
+    debtor, debtor_password = user_factory(email='debtor-sel@example.com')
+    creditor, _ = user_factory(email='creditor-sel@example.com')
+
+    admin, _ = user_factory(email='admin-sel@example.com')
+    group = group_factory(creator=admin)
+
+    db.session.add(Membership(user_id=debtor.id, group_id=group.id, role='member'))
+    db.session.add(Membership(user_id=creditor.id, group_id=group.id, role='member'))
+    db.session.commit()
+
+    login_user(debtor.email, debtor_password)
+
+    expense1 = Expense(
+        group_id=group.id,
+        paid_by=creditor.id,
+        description='Dinner',
+        amount=50.00,
+        category='Food',
+        split_type='equal',
+        date=date(2025, 1, 1),
+    )
+    db.session.add(expense1)
+    db.session.flush()
+
+    expense2 = Expense(
+        group_id=group.id,
+        paid_by=creditor.id,
+        description='Lunch',
+        amount=30.00,
+        category='Food',
+        split_type='equal',
+        date=date(2025, 1, 2),
+    )
+    db.session.add(expense2)
+    db.session.flush()
+
+    split1 = ExpenseSplit(expense_id=expense1.id, user_id=debtor.id, share_amount=25.00)
+    split2 = ExpenseSplit(expense_id=expense2.id, user_id=debtor.id, share_amount=15.00)
+    db.session.add(split1)
+    db.session.add(split2)
+    db.session.commit()
+
+    # Pay exactly split1's share — greedy covers $15 first, then $25, so both are
+    # cleared when paying the full $25. To isolate split1 only we pay exactly $25
+    # which covers the $15 split AND the $25 split (total $40 > $25), so only the
+    # $15 split (smallest first) is covered — leaving $10 remainder which doesn't
+    # cover the $25 split.
+    # Simpler: pay only $15 so that only the $15 split is covered.
+    client.post(
+        f'/groups/{group.id}/settle',
+        data={
+            'debtor_id': debtor.id,
+            'creditor_id': creditor.id,
+            'payment_amount': '15.00',
+        },
+        follow_redirects=True,
+    )
+
+    db.session.expire_all()
+    split1_refresh = ExpenseSplit.query.get(split1.id)
+    split2_refresh = ExpenseSplit.query.get(split2.id)
+    # Greedy smallest-first: $15 split is cleared by $15 payment; $25 split remains
+    assert split1_refresh.is_paid is False
+    assert split2_refresh.is_paid is True
+
+
+def test_settle_rejects_non_debtor(client, user_factory, group_factory, login_user):
+    debtor, _ = user_factory(email='debtor-auth@example.com')
+    creditor, _ = user_factory(email='creditor-auth@example.com')
+    other_user, other_password = user_factory(email='other-auth@example.com')
+    admin, _ = user_factory(email='admin-auth@example.com')
+
+    group = group_factory(creator=admin)
+    db.session.add(Membership(user_id=debtor.id, group_id=group.id, role='member'))
+    db.session.add(Membership(user_id=creditor.id, group_id=group.id, role='member'))
+    db.session.add(Membership(user_id=other_user.id, group_id=group.id, role='member'))
+    db.session.commit()
+
+    expense = Expense(
+        group_id=group.id,
+        paid_by=creditor.id,
+        description='Dinner',
+        amount=50.00,
+        category='Food',
+        split_type='equal',
+        date=date(2025, 1, 1),
+    )
+    db.session.add(expense)
+    db.session.flush()
+
+    split = ExpenseSplit(expense_id=expense.id, user_id=debtor.id, share_amount=25.00)
+    db.session.add(split)
+    db.session.commit()
+
+    login_user(other_user.email, other_password)
+
+    response = client.post(
+        f'/groups/{group.id}/settle',
+        data={
+            'debtor_id': debtor.id,
+            'creditor_id': creditor.id,
+            'payment_amount': '25.00',
+        },
+        follow_redirects=True,
+    )
+
+    assert b'You can only settle your own debts' in response.data
+
+
+def test_settle_cross_debts_nets_correctly(client, user_factory, group_factory, login_user):
+    # bob owes alice $10 + $30 = $40 total
+    # alice owes bob $25
+    # net cash_due = $40 - $25 = $15
+    # sorted splits: [$10, $30] — $10 is fully covered, $30 is not
+    alice, _ = user_factory(email='alice-cross@example.com')
+    bob, bob_password = user_factory(email='bob-cross@example.com')
+
+    admin, _ = user_factory(email='admin-cross@example.com')
+    group = group_factory(creator=admin)
+
+    db.session.add(Membership(user_id=alice.id, group_id=group.id, role='member'))
+    db.session.add(Membership(user_id=bob.id, group_id=group.id, role='member'))
+    db.session.commit()
+
+    expense1 = Expense(
+        group_id=group.id, paid_by=bob.id, description='Bob paid',
+        amount=50.00, category='Food', split_type='equal', date=date(2025, 1, 1),
+    )
+    db.session.add(expense1)
+    expense2 = Expense(
+        group_id=group.id, paid_by=alice.id, description='Alice paid A',
+        amount=20.00, category='Food', split_type='equal', date=date(2025, 1, 2),
+    )
+    db.session.add(expense2)
+    expense3 = Expense(
+        group_id=group.id, paid_by=alice.id, description='Alice paid B',
+        amount=60.00, category='Food', split_type='equal', date=date(2025, 1, 3),
+    )
+    db.session.add(expense3)
+    db.session.flush()
+
+    alice_owes_bob = ExpenseSplit(expense_id=expense1.id, user_id=alice.id, share_amount=25.00)
+    bob_owes_alice_small = ExpenseSplit(expense_id=expense2.id, user_id=bob.id, share_amount=10.00)
+    bob_owes_alice_large = ExpenseSplit(expense_id=expense3.id, user_id=bob.id, share_amount=30.00)
+    db.session.add(alice_owes_bob)
+    db.session.add(bob_owes_alice_small)
+    db.session.add(bob_owes_alice_large)
+    db.session.commit()
+
+    login_user(bob.email, bob_password)
+
+    client.post(
+        f'/groups/{group.id}/settle',
+        data={'debtor_id': bob.id, 'creditor_id': alice.id, 'payment_amount': '40.00'},
+        follow_redirects=True,
+    )
+
+    db.session.expire_all()
+
+    assert ExpenseSplit.query.get(alice_owes_bob.id).is_paid is True      # reciprocal cleared
+    assert ExpenseSplit.query.get(bob_owes_alice_small.id).is_paid is True  # $10 covered by $15 net
+    assert ExpenseSplit.query.get(bob_owes_alice_large.id).is_paid is False  # $30 not covered by remaining $5
+
+
+def test_settle_partial_cross_debt(client, user_factory, group_factory, login_user):
+    alice, _ = user_factory(email='alice-partial@example.com')
+    bob, bob_password = user_factory(email='bob-partial@example.com')
+
+    admin, _ = user_factory(email='admin-partial@example.com')
+    group = group_factory(creator=admin)
+
+    db.session.add(Membership(user_id=alice.id, group_id=group.id, role='member'))
+    db.session.add(Membership(user_id=bob.id, group_id=group.id, role='member'))
+    db.session.commit()
+
+    expense1 = Expense(
+        group_id=group.id,
+        paid_by=bob.id,
+        description='Bob paid $100',
+        amount=100.00,
+        category='Food',
+        split_type='equal',
+        date=date(2025, 1, 1),
+    )
+    db.session.add(expense1)
+    db.session.flush()
+
+    expense2 = Expense(
+        group_id=group.id,
+        paid_by=alice.id,
+        description='Alice paid $50',
+        amount=50.00,
+        category='Food',
+        split_type='equal',
+        date=date(2025, 1, 2),
+    )
+    db.session.add(expense2)
+    db.session.flush()
+
+    bob_owes_alice = ExpenseSplit(expense_id=expense2.id, user_id=bob.id, share_amount=50.00)
+    alice_owes_bob = ExpenseSplit(expense_id=expense1.id, user_id=alice.id, share_amount=25.00)
+    db.session.add(bob_owes_alice)
+    db.session.add(alice_owes_bob)
+    db.session.commit()
+
+    login_user(bob.email, bob_password)
+
+    client.post(
+        f'/groups/{group.id}/settle',
+        data={
+            'debtor_id': bob.id,
+            'creditor_id': alice.id,
+            'payment_amount': '50.00',
+        },
+        follow_redirects=True,
+    )
+
+    db.session.expire_all()
+
+    bob_owes_alice_refresh = ExpenseSplit.query.get(bob_owes_alice.id)
+    alice_owes_bob_refresh = ExpenseSplit.query.get(alice_owes_bob.id)
+
+    # alice_owes_bob ($25) fully offset against bob's $50 payment → cleared
+    assert alice_owes_bob_refresh.is_paid is True
+    assert alice_owes_bob_refresh.paid_amount == alice_owes_bob_refresh.share_amount
+    # cash_due after offset = $50 - $25 = $25, which is < $50 split → partially paid
+    assert bob_owes_alice_refresh.is_paid is False
+    assert bob_owes_alice_refresh.paid_amount == 25
+
+
+def test_settle_reciprocal_larger_than_net(client, user_factory, group_factory, login_user):
+    # Bob owes Alice $10, Alice owes Bob $50.
+    # The reciprocal ($50) exceeds debtor_total ($10) so it must NOT be marked paid.
+    # cash_due = max(10 - 0, 0) = 10, which covers Bob's $10 split fully.
+    alice, _ = user_factory(email='alice-recip@example.com')
+    bob, bob_password = user_factory(email='bob-recip@example.com')
+
+    admin, _ = user_factory(email='admin-recip@example.com')
+    group = group_factory(creator=admin)
+
+    db.session.add(Membership(user_id=alice.id, group_id=group.id, role='member'))
+    db.session.add(Membership(user_id=bob.id, group_id=group.id, role='member'))
+    db.session.commit()
+
+    expense1 = Expense(
+        group_id=group.id, paid_by=bob.id, description='Bob paid big',
+        amount=100.00, category='Food', split_type='equal', date=date(2025, 1, 1),
+    )
+    db.session.add(expense1)
+    expense2 = Expense(
+        group_id=group.id, paid_by=alice.id, description='Alice paid small',
+        amount=20.00, category='Food', split_type='equal', date=date(2025, 1, 2),
+    )
+    db.session.add(expense2)
+    db.session.flush()
+
+    alice_owes_bob = ExpenseSplit(expense_id=expense1.id, user_id=alice.id, share_amount=50.00)
+    bob_owes_alice = ExpenseSplit(expense_id=expense2.id, user_id=bob.id, share_amount=10.00)
+    db.session.add(alice_owes_bob)
+    db.session.add(bob_owes_alice)
+    db.session.commit()
+
+    login_user(bob.email, bob_password)
+
+    client.post(
+        f'/groups/{group.id}/settle',
+        data={'debtor_id': bob.id, 'creditor_id': alice.id, 'payment_amount': '10.00'},
+        follow_redirects=True,
+    )
+
+    db.session.expire_all()
+
+    assert ExpenseSplit.query.get(bob_owes_alice.id).is_paid is True   # $10 fully covered by cash_due
+    assert ExpenseSplit.query.get(alice_owes_bob.id).is_paid is False  # $50 > debtor_total $10, not marked
+
+
+def test_settle_partial_amount(client, user_factory, group_factory, login_user):
+    # Bob owes Alice $10 + $30 = $40 total, no cross-debts.
+    # Bob pays $15 — greedy smallest-first covers the $10 split (cash_due $5 left),
+    # but $5 < $30 so the large split stays unpaid.
+    alice, _ = user_factory(email='alice-pamt@example.com')
+    bob, bob_password = user_factory(email='bob-pamt@example.com')
+
+    admin, _ = user_factory(email='admin-pamt@example.com')
+    group = group_factory(creator=admin)
+
+    db.session.add(Membership(user_id=alice.id, group_id=group.id, role='member'))
+    db.session.add(Membership(user_id=bob.id, group_id=group.id, role='member'))
+    db.session.commit()
+
+    expense1 = Expense(
+        group_id=group.id, paid_by=alice.id, description='Dinner',
+        amount=20.00, category='Food', split_type='equal', date=date(2025, 1, 1),
+    )
+    db.session.add(expense1)
+    expense2 = Expense(
+        group_id=group.id, paid_by=alice.id, description='Hotel',
+        amount=60.00, category='Accommodation', split_type='equal', date=date(2025, 1, 2),
+    )
+    db.session.add(expense2)
+    db.session.flush()
+
+    split_small = ExpenseSplit(expense_id=expense1.id, user_id=bob.id, share_amount=10.00)
+    split_large = ExpenseSplit(expense_id=expense2.id, user_id=bob.id, share_amount=30.00)
+    db.session.add(split_small)
+    db.session.add(split_large)
+    db.session.commit()
+
+    login_user(bob.email, bob_password)
+
+    client.post(
+        f'/groups/{group.id}/settle',
+        data={'debtor_id': bob.id, 'creditor_id': alice.id, 'payment_amount': '15.00'},
+        follow_redirects=True,
+    )
+
+    db.session.expire_all()
+
+    # $10 split fully covered; $5 remainder goes into paid_amount on the $30 split
+    assert ExpenseSplit.query.get(split_small.id).is_paid is True
+    assert ExpenseSplit.query.get(split_large.id).is_paid is False
+    assert ExpenseSplit.query.get(split_large.id).paid_amount == 5
+
+
+def test_settle_rejects_amount_exceeding_balance(client, user_factory, group_factory, login_user):
+    alice, _ = user_factory(email='alice-exceed@example.com')
+    bob, bob_password = user_factory(email='bob-exceed@example.com')
+
+    admin, _ = user_factory(email='admin-exceed@example.com')
+    group = group_factory(creator=admin)
+
+    db.session.add(Membership(user_id=alice.id, group_id=group.id, role='member'))
+    db.session.add(Membership(user_id=bob.id, group_id=group.id, role='member'))
+    db.session.commit()
+
+    expense = Expense(
+        group_id=group.id, paid_by=alice.id, description='Groceries',
+        amount=40.00, category='Food', split_type='equal', date=date(2025, 1, 1),
+    )
+    db.session.add(expense)
+    db.session.flush()
+
+    split = ExpenseSplit(expense_id=expense.id, user_id=bob.id, share_amount=20.00)
+    db.session.add(split)
+    db.session.commit()
+
+    login_user(bob.email, bob_password)
+
+    response = client.post(
+        f'/groups/{group.id}/settle',
+        data={'debtor_id': bob.id, 'creditor_id': alice.id, 'payment_amount': '999.00'},
+        follow_redirects=True,
+    )
+
+    assert b'Payment amount exceeds outstanding balance' in response.data
+    db.session.expire_all()
+    assert ExpenseSplit.query.get(split.id).is_paid is False
+
+
+def test_settle_partial_payment_reduces_transfer_amount(app, client, user_factory, group_factory, login_user):
+    # Regression: u2 owes u1 $50. u2 pays $40.
+    # Before this fix the $50 split was not marked paid (correct) but paid_amount
+    # stayed 0, so the transfer still showed $50 — the $40 was silently lost.
+    # After the fix: paid_amount=$40, is_paid=False, transfer shows $10 remaining.
+    u1, _ = user_factory(email='u1-regression@example.com')
+    u2, u2_password = user_factory(email='u2-regression@example.com')
+
+    admin, _ = user_factory(email='admin-regression@example.com')
+    group = group_factory(creator=admin)
+
+    db.session.add(Membership(user_id=u1.id, group_id=group.id, role='member'))
+    db.session.add(Membership(user_id=u2.id, group_id=group.id, role='member'))
+    db.session.commit()
+
+    expense = Expense(
+        group_id=group.id, paid_by=u1.id, description='Dinner',
+        amount=100.00, category='Food', split_type='equal', date=date(2025, 1, 1),
+    )
+    db.session.add(expense)
+    db.session.flush()
+
+    split_u1 = ExpenseSplit(expense_id=expense.id, user_id=u1.id, share_amount=50.00)
+    split_u2 = ExpenseSplit(expense_id=expense.id, user_id=u2.id, share_amount=50.00)
+    db.session.add(split_u1)
+    db.session.add(split_u2)
+    db.session.commit()
+
+    login_user(u2.email, u2_password)
+
+    client.post(
+        f'/groups/{group.id}/settle',
+        data={'debtor_id': u2.id, 'creditor_id': u1.id, 'payment_amount': '40.00'},
+        follow_redirects=True,
+    )
+
+    db.session.expire_all()
+
+    split_u2_refresh = ExpenseSplit.query.get(split_u2.id)
+    # Split not fully paid — is_paid stays False
+    assert split_u2_refresh.is_paid is False
+    # But $40 progress is recorded
+    assert split_u2_refresh.paid_amount == 40
+
+    # The transfer amount now reflects only the $10 still outstanding
+    members_by_id = {u1.id: u1, u2.id: u2}
+    expenses = Expense.query.filter_by(group_id=group.id).all()
+    _, _, transfers, _ = _compute_group_data(members_by_id, expenses)
+
+    assert len(transfers) == 1
+    assert transfers[0]['amount'] == 10.00
