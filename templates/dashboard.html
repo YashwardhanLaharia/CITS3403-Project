@@ -128,6 +128,17 @@
                 ${{ "%.2f"|format(e.amount) }} &middot; {{ e.category }} &middot; {{ e.date.strftime('%d %b %Y') }} &middot; paid by {{ e.payer.display_name }}
               </div>
           </div>
+          <div style="margin-top:8px;">
+            <form method="POST"
+                  action="/groups/{{ group.id }}/expenses/{{ e.id }}/delete"
+                  onsubmit="return confirm('Are you sure you want to delete this expense?')"
+                  style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn-expense-action btn-delete">
+                <i class="bi bi-trash"></i> Delete
+              </button>
+            </form>
+          </div>
         </div>
         {% endfor %}
       {% else %}
