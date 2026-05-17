@@ -345,7 +345,15 @@ class TestProfile:
 
     def test_profile_displays_user_info(self, app, driver):
         """Navigate to profile, verify name and email are populated."""
-        pytest.skip("not implemented")
+        _seed_user(app, email='profile@example.com', first='Alice', last='Smith')
+        _login(driver, 'profile@example.com', 'Password123!')
+        driver.get(BASE_URL + '/profile')
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, 'first-name'))
+        )
+        assert driver.find_element(By.ID, 'first-name').get_attribute('value') == 'Alice'
+        assert driver.find_element(By.ID, 'last-name').get_attribute('value') == 'Smith'
+        assert driver.find_element(By.ID, 'email').get_attribute('value') == 'profile@example.com'
 
     def test_profile_update_name(self, app, driver):
         """Change first name, enter current password, submit, verify
