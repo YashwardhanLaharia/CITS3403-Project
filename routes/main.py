@@ -777,34 +777,32 @@ def settle(group_id):
 
     if selected_split_ids:
         splits_to_settle = [s for s in splits if s.id in selected_split_ids]
-        cross_splits_to_settle = [s for s in cross_splits if s.id in selected_split_ids]
     else:
         splits_to_settle = splits
-        cross_splits_to_settle = cross_splits
+
+    cross_splits_to_settle = cross_splits
 
     if not splits_to_settle and not cross_splits_to_settle:
         flash('No outstanding splits found.', 'error')
         return redirect(url_for('main.group_dashboard', group_id=group_id))
 
-    splits_total = sum(float(s.share_amount) for s in splits_to_settle)
-    cross_splits_total = sum(float(s.share_amount) for s in cross_splits_to_settle)
-    net_settle = splits_total - cross_splits_total
+    debtor_total = sum(float(s.share_amount) for s in splits_to_settle)
+    reciprocal_total = sum(float(s.share_amount) for s in cross_splits_to_settle)
 
-    remaining = net_settle
-    if remaining > 0:
+    offset_applied = 0.0
+    for split in cross_splits_to_settle:
+        if offset_applied >= debtor_total:
+            break
+        split.is_paid = True
+        offset_applied += float(split.share_amount)
+
+    cash_due = max(debtor_total - offset_applied, 0)
+    if cash_due > 0:
         for split in splits_to_settle:
-            split_amount = float(split.share_amount)
-            split.is_paid = True
-            if remaining <= split_amount:
+            if cash_due <= 0:
                 break
-            remaining -= split_amount
-    elif remaining < 0:
-        for split in cross_splits_to_settle:
-            split_amount = float(split.share_amount)
             split.is_paid = True
-            if abs(remaining) <= split_amount:
-                break
-            remaining += split_amount
+            cash_due -= float(split.share_amount)
 
     db.session.commit()
     flash('Settlement marked as paid.', 'success')

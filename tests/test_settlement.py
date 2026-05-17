@@ -356,16 +356,14 @@ def test_settle_selective_splits(client, user_factory, group_factory, login_user
 
 def test_settle_cross_debts_nets_correctly(client, user_factory, group_factory, login_user):
     alice, _ = user_factory(email='alice-cross@example.com')
-    bob, _ = user_factory(email='bob-cross@example.com')
+    bob, bob_password = user_factory(email='bob-cross@example.com')
 
-    admin, password = user_factory(email='admin-cross@example.com')
+    admin, _ = user_factory(email='admin-cross@example.com')
     group = group_factory(creator=admin)
 
     db.session.add(Membership(user_id=alice.id, group_id=group.id, role='member'))
     db.session.add(Membership(user_id=bob.id, group_id=group.id, role='member'))
     db.session.commit()
-
-    login_user(alice.email, password)
 
     expense1 = Expense(
         group_id=group.id,
@@ -391,11 +389,13 @@ def test_settle_cross_debts_nets_correctly(client, user_factory, group_factory, 
     db.session.add(expense2)
     db.session.flush()
 
-    bob_owes_alice = ExpenseSplit(expense_id=expense1.id, user_id=bob.id, share_amount=40.00)
-    alice_owes_bob = ExpenseSplit(expense_id=expense2.id, user_id=alice.id, share_amount=25.00)
+    bob_owes_alice = ExpenseSplit(expense_id=expense2.id, user_id=bob.id, share_amount=40.00)
+    alice_owes_bob = ExpenseSplit(expense_id=expense1.id, user_id=alice.id, share_amount=25.00)
     db.session.add(bob_owes_alice)
     db.session.add(alice_owes_bob)
     db.session.commit()
+
+    login_user(bob.email, bob_password)
 
     client.post(
         f'/groups/{group.id}/settle',
@@ -418,16 +418,14 @@ def test_settle_cross_debts_nets_correctly(client, user_factory, group_factory, 
 
 def test_settle_partial_cross_debt(client, user_factory, group_factory, login_user):
     alice, _ = user_factory(email='alice-partial@example.com')
-    bob, _ = user_factory(email='bob-partial@example.com')
+    bob, bob_password = user_factory(email='bob-partial@example.com')
 
-    admin, password = user_factory(email='admin-partial@example.com')
+    admin, _ = user_factory(email='admin-partial@example.com')
     group = group_factory(creator=admin)
 
     db.session.add(Membership(user_id=alice.id, group_id=group.id, role='member'))
     db.session.add(Membership(user_id=bob.id, group_id=group.id, role='member'))
     db.session.commit()
-
-    login_user(alice.email, password)
 
     expense1 = Expense(
         group_id=group.id,
@@ -453,11 +451,13 @@ def test_settle_partial_cross_debt(client, user_factory, group_factory, login_us
     db.session.add(expense2)
     db.session.flush()
 
-    bob_owes_alice = ExpenseSplit(expense_id=expense1.id, user_id=bob.id, share_amount=50.00)
-    alice_owes_bob = ExpenseSplit(expense_id=expense2.id, user_id=alice.id, share_amount=25.00)
+    bob_owes_alice = ExpenseSplit(expense_id=expense2.id, user_id=bob.id, share_amount=50.00)
+    alice_owes_bob = ExpenseSplit(expense_id=expense1.id, user_id=alice.id, share_amount=25.00)
     db.session.add(bob_owes_alice)
     db.session.add(alice_owes_bob)
     db.session.commit()
+
+    login_user(bob.email, bob_password)
 
     client.post(
         f'/groups/{group.id}/settle',
@@ -475,4 +475,4 @@ def test_settle_partial_cross_debt(client, user_factory, group_factory, login_us
     alice_owes_bob_refresh = ExpenseSplit.query.get(alice_owes_bob.id)
 
     assert bob_owes_alice_refresh.is_paid is True
-    assert alice_owes_bob_refresh.is_paid is False
+    assert alice_owes_bob_refresh.is_paid is True
