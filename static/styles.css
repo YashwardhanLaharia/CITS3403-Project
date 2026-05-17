@@ -181,7 +181,7 @@
     }
 
     /* ── PAGE BODY ── */
-    .page-body { padding: 36px 32px; flex: 1; }
+    .page-body { padding: 36px 56px; flex: 1; width: 100%; max-width: 2000px; margin: 0 auto; }
 
     /* ── WELCOME HEADER ── */
     .welcome-row {
@@ -318,29 +318,6 @@
       gap: 14px;
       margin-bottom: 14px;
     }
-
-    .invite-row {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 18px;
-    }
-
-    .invite-row .form-input { flex: 1; }
-
-    .btn-add-member {
-      background: var(--accent-dim);
-      border: 1px solid rgba(61,217,164,0.2);
-      color: var(--accent);
-      border-radius: 9px;
-      padding: 10px 16px;
-      font-size: 0.8rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s;
-      white-space: nowrap;
-    }
-
-    .btn-add-member:hover { background: var(--accent); color: #0c0f1a; }
 
     .btn-primary-action {
       display: inline-flex;
@@ -687,6 +664,10 @@
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
     /* ── AUTH PAGES (login + signup) ── */
+
+    /* Hide sidebar on auth pages */
+    body:has(.login-left) .sidebar,
+    body:has(.login-left) .sidebar-backdrop { display: none; }
 
     /* Left brand panel */
     .login-left {
@@ -1598,3 +1579,290 @@
       font-family: 'DM Sans', sans-serif;
       font-size: 0.9rem;
     }
+
+/* ── RESPONSIVE ── */
+
+.hamburger-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  margin-right: 12px;
+  transition: all 0.2s;
+}
+
+.hamburger-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-card-alt);
+}
+
+.sidebar-close-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.95rem;
+  margin-left: auto;
+  margin-bottom: 16px;
+  transition: all 0.2s;
+}
+
+.sidebar-close-btn:hover {
+  color: var(--text-primary);
+  border-color: rgba(255,255,255,0.15);
+}
+
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 150;
+  cursor: pointer;
+}
+
+.sidebar-backdrop.active {
+  display: block;
+}
+
+/* ── Tablet breakpoint (768px - 1024px) ── */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .groups-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .action-row {
+    grid-template-columns: 1fr;
+  }
+
+  /* Dashboard — 2 column member grid on tablet */
+  .members-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Dashboard — main grid stacks on tablet */
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.28s ease;
+    z-index: 200;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  .main-content {
+    margin-left: 0;
+  }
+
+  .hamburger-btn {
+    display: flex;
+  }
+
+  .sidebar-close-btn {
+    display: flex;
+  }
+
+  .topnav {
+    z-index: 180;
+  }
+
+  /* Homepage — action row stacks on mobile */
+  .action-row {
+    grid-template-columns: 1fr;
+  }
+
+  /* Homepage — group cards single column on mobile */
+  .groups-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Dashboard — main grid stacks on mobile */
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Dashboard — member cards single column on mobile */
+  .members-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Dashboard — hero section stacks on mobile */
+  .group-hero {
+    flex-direction: column;
+  }
+
+  /* Dashboard — spending card full width on mobile */
+  .spending-card {
+    min-width: 0;
+    width: 100%;
+  }
+
+  /* Modals — full width with small margins on mobile */
+  .modal-dialog {
+    margin: 0.5rem;
+    max-width: calc(100% - 1rem);
+  }
+
+  /* Modals — reduce padding inside modal body on mobile */
+  .modal-content .modal-body {
+    padding: 1rem !important;
+  }
+
+  /* Modals — stack two column form rows on mobile */
+  .form-row-2 {
+    grid-template-columns: 1fr;
+  }
+
+  /* Modals — reduce modal footer padding on mobile */
+  .modal-content .modal-footer {
+    padding: 0.75rem 1rem;
+  }
+
+  /* Typography — scale down hero titles on mobile */
+  .hero-title,
+  .welcome-title {
+    font-size: 1.6rem;
+  }
+
+  /* Typography — scale down spending amount on mobile */
+  .spending-amount {
+    font-size: 1.4rem;
+  }
+
+  /* Spacing — reduce page body padding on mobile */
+  .page-body {
+    padding: 16px;
+  }
+
+  /* Spacing — reduce topnav padding on mobile */
+  .topnav {
+    padding: 12px 16px;
+  }
+
+  /* Homepage/Dashboard — stack welcome row on mobile */
+  .welcome-row {
+    flex-direction: column;
+  }
+
+  /* Spacing — reduce net balance card padding on mobile */
+  .net-balance-card {
+    padding: 12px 16px;
+    width: 100%;
+    text-align: left;
+  }
+
+  /* Spacing — reduce spending card padding on mobile */
+  .spending-card {
+    padding: 14px 16px;
+  }
+
+  /* Typography — scale down section titles on mobile */
+  .section-title {
+    font-size: 0.9rem;
+  }
+
+  /* Topnav — hide search bar on mobile to save space */
+  .search-bar {
+    display: none;
+  }
+
+  /* Force single column for expense distribution and activity grids */
+  .archived-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Reduce gap between sections on mobile */
+  .page-body > * {
+    margin-bottom: 16px;
+  }
+
+  /* Login/Signup — hide brand panel on mobile, form goes full screen */
+  .login-left {
+    display: none;
+  }
+
+  .login-right {
+    width: 100%;
+    padding: 24px 16px;
+    min-height: 100vh;
+  }
+
+  .login-card {
+    padding: 24px 20px;
+    max-width: 100%;
+  }
+
+  .login-heading {
+    font-size: 1.5rem;
+  }
+
+  .field-row-2 {
+    grid-template-columns: 1fr;
+  }
+
+  /* Dashboard — constrain all cards to screen width */
+  .member-card,
+  .flow-table,
+  .distribution-card,
+  .balances-card,
+  .settlement-card {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* Dashboard — reduce card padding on mobile */
+  .member-card {
+    padding: 14px;
+  }
+
+  /* Dashboard — make flow table columns stack on mobile */
+  .flow-table-header {
+    display: none;
+  }
+
+  .flow-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+  }
+
+  /* Dashboard — section headers smaller on mobile */
+  .section-header {
+    margin-bottom: 10px;
+  }
+
+  /* Dashboard — right panel full width on mobile */
+  .right-panel {
+    width: 100%;
+  }
+
+  /* Dashboard — reduce member card avatar size on mobile */
+  .avatar-md {
+    width: 34px;
+    height: 34px;
+    font-size: 0.7rem;
+  }
+}

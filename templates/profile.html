@@ -2,18 +2,13 @@
 {% block title_suffix %} – Profile{% endblock %}
 
 {% block body %}
-{% include "_sidebar.html" %}
-
 <div class="main-content">
 
   <nav class="topnav">
-    <div class="search-bar">
-      <i class="bi bi-search"></i>
-      Search...
-    </div>
+    <button class="hamburger-btn" id="hamburger-btn" aria-label="Open menu">
+      <i class="bi bi-list"></i>
+    </button>
     <div class="topnav-icons">
-      <div class="icon-btn"><i class="bi bi-bell"></i></div>
-      <div class="icon-btn"><i class="bi bi-gear"></i></div>
       <div class="avatar-sm">{{ initials|default('--') }}</div>
     </div>
   </nav>
@@ -31,7 +26,7 @@
       <div class="form-card-title"><i class="bi bi-person-circle"></i> Account Details</div>
 
         <form method="POST" action="{{ url_for('main.profile') }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <div class="field-row-2 field-group">
           <div>
             <label class="form-label-sm" for="first-name">First Name</label>
@@ -49,6 +44,11 @@
           <label class="form-label-sm" for="email">Email Address</label>
           <input class="form-input" type="email" id="email" name="email"
                  value="{{ email|default('') }}" disabled/>
+        </div>
+
+        <div class="field-group">
+          <label class="form-label-sm">Member Since</label>
+          <div class="form-input" style="background:var(--bg-card); cursor:default;">{{ created_at.strftime('%B %Y') }}</div>
         </div>
 
         <div class="field-group">
@@ -78,7 +78,7 @@
           <label class="form-label-sm" for="delete-password">Current Password</label>
           <input class="form-input" type="password" id="delete-password" name="delete_password" placeholder="Required to confirm"/>
         </div>
-        <button type="submit" class="btn-outline-danger">
+        <button type="submit" class="btn-outline-danger" onclick="return confirm('Are you sure you want to delete your account? This action cannot be undone. Your contributed data will remain in shared groups.')">
           <i class="bi bi-trash"></i> Permanently delete my account
         </button>
       </form>

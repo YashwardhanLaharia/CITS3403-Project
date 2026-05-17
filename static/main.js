@@ -129,6 +129,11 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       data = await response.json();
     } catch {
+      const alert = document.createElement('div');
+      alert.className = 'ajax-error';
+      alert.style.cssText = 'color:var(--danger,#e05252);margin-bottom:1rem;font-size:0.875rem;';
+      alert.textContent = 'Network error. Please try again.';
+      form.querySelector('.modal-body').prepend(alert);
       return;
     }
 

@@ -1,4 +1,7 @@
 <aside class="sidebar">
+  <button class="sidebar-close-btn" id="sidebar-close-btn" aria-label="Close menu">
+    <i class="bi bi-x-lg"></i>
+  </button>
   <a href="{{ url_for('main.index') }}" class="sidebar-logo" style="text-decoration:none;">Split<span>Mate</span></a>
 
   <div class="sidebar-section-label">Navigation</div>
@@ -6,9 +9,6 @@
   {% if group is defined and group %}
   <a href="{{ url_for('main.group_dashboard', group_id=group.id) }}" class="nav-item-btn {{ 'active' if active_page == 'dashboard' }}"><i class="bi bi-grid-1x2"></i> Dashboard</a>
   {% endif %}
-  <a href="#" class="nav-item-btn"><i class="bi bi-receipt"></i> Expenses</a>
-  <a href="#" class="nav-item-btn"><i class="bi bi-activity"></i> Activity</a>
-  <a href="#" class="nav-item-btn"><i class="bi bi-arrow-left-right"></i> Settlements</a>
 
   <button class="add-expense-btn" data-bs-toggle="modal" data-bs-target="#createGroupModal">
     <i class="bi bi-people-fill"></i> New Group

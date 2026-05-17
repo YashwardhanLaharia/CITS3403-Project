@@ -1,9 +1,10 @@
 import re
+import secrets
 from datetime import datetime, date, timezone
 from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify
 from flask_login import login_required, current_user, logout_user
 from sqlalchemy import func
-from extensions import db, login_manager
+from extensions import db, login_manager, limiter
 from models import User, Group, Membership, Expense, ExpenseSplit
 
 main_bp = Blueprint('main', __name__)
@@ -12,8 +13,8 @@ main_bp = Blueprint('main', __name__)
 @login_manager.user_loader
 def load_user(user_id):
     user = User.query.get(int(user_id))
-    if user is None:
-        login_manager.unauthorized()
+    if user is None or user.status != 'active':
+        return None
     return user
 
 
@@ -248,11 +249,14 @@ def group_dashboard(group_id):
     expenses = Expense.query.filter_by(group_id=group_id).order_by(Expense.date.desc()).all()
 
     members, categories, transfers, total_spent = _compute_group_data(members_by_id, expenses)
+    active_members = [m for m in members if members_by_id.get(m['id']).status == 'active']
 
     return render_template(
         'dashboard.html',
         group=group,
+        membership=membership,
         members=members,
+        active_members=active_members,
         expenses=expenses,
         categories=categories,
         transfers=transfers,
@@ -261,8 +265,13 @@ def group_dashboard(group_id):
     )
 
 
+def get_user_id():
+    return str(current_user.id)
+
+
 @main_bp.route('/groups/<int:group_id>/data')
 @login_required
+@limiter.limit("100 per minute", key_func=get_user_id)
 def group_data(group_id):
     Membership.query.filter_by(
         group_id=group_id, user_id=current_user.id
@@ -389,6 +398,7 @@ def delete_account():
     current_user.status = 'deleted'
     current_user.deleted_at = datetime.now(timezone.utc)
     current_user.email = None
+    current_user.set_password(secrets.token_hex(32))
     db.session.commit()
     logout_user()
     flash('Your account was deleted. The data you contributed remains in shared groups.', 'info')
@@ -417,6 +427,24 @@ def join_group():
     db.session.commit()
 
     flash(f'You have joined "{group.name}" successfully!', 'success')
+    return redirect(url_for('main.index'))
+
+
+@main_bp.route('/groups/<int:group_id>/leave', methods=['POST'])
+@login_required
+def leave_group(group_id):
+    membership = Membership.query.filter_by(
+        group_id=group_id, user_id=current_user.id
+    ).first_or_404()
+
+    if membership.role == 'admin':
+        flash('Admins cannot leave their own group. Transfer ownership or delete the group instead.', 'error')
+        return redirect(url_for('main.group_dashboard', group_id=group_id))
+
+    db.session.delete(membership)
+    db.session.commit()
+
+    flash('You have left the group.', 'success')
     return redirect(url_for('main.index'))
 
 
@@ -476,17 +504,6 @@ def add_expense(group_id):
     if not description:
         errors.append('Description is required.')
 
-    amount = None
-    if not amount_str:
-        errors.append('Amount is required.')
-    else:
-        try:
-            amount = float(amount_str)
-            if amount <= 0:
-                errors.append('Amount must be a positive number.')
-        except ValueError:
-            errors.append('Amount must be a valid number.')
-
     if category not in EXPENSE_CATEGORIES:
         errors.append('Please select a valid category.')
 
@@ -502,10 +519,11 @@ def add_expense(group_id):
 
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
-    members = Membership.query.filter_by(group_id=group_id).all()
+    members = [m for m in Membership.query.filter_by(group_id=group_id).all() if m.user.status == 'active']
 
+    amount = None
     split_amounts = {}
-    if split_type == 'custom' and amount is not None:
+    if split_type == 'custom':
         total_split = 0.0
         for m in members:
             raw = request.form.get(f'split_amount_{m.user_id}', '0')
@@ -519,8 +537,21 @@ def add_expense(group_id):
                 break
             split_amounts[m.user_id] = share
             total_split += share
-        if not errors and abs(total_split - amount) > 0.01:
-            errors.append('Split amounts must add up to the total expense amount.')
+        if not errors:
+            if total_split <= 0:
+                errors.append('Total split amount must be greater than zero.')
+            else:
+                amount = total_split
+    else:
+        if not amount_str:
+            errors.append('Amount is required.')
+        else:
+            try:
+                amount = float(amount_str)
+                if amount <= 0:
+                    errors.append('Amount must be a positive number.')
+            except ValueError:
+                errors.append('Amount must be a valid number.')
 
     if errors:
         if is_ajax:

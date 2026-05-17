@@ -25,6 +25,8 @@ def upgrade():
 
 
 def downgrade():
+    op.execute("UPDATE users SET email = 'deleted_' || id || '@placeholder.invalid' WHERE email IS NULL AND status = 'deleted'")
+
     with op.batch_alter_table('users', schema=None) as batch_op:
         batch_op.alter_column('email', existing_type=sa.String(length=120), nullable=False)
 

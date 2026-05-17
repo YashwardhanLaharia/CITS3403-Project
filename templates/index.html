@@ -2,30 +2,25 @@
 {% block title_suffix %} – Home{% endblock %}
 
 {% block body %}
-{% include "_sidebar.html" %}
-
 <div class="main-content">
 
   <nav class="topnav">
-    <div class="search-bar">
-      <i class="bi bi-search"></i>
-      Search groups...
-    </div>
+    <button class="hamburger-btn" id="hamburger-btn" aria-label="Open menu">
+      <i class="bi bi-list"></i>
+    </button>
     <div class="topnav-icons">
-      <div class="icon-btn"><i class="bi bi-bell"></i></div>
-      <div class="icon-btn"><i class="bi bi-gear"></i></div>
       <div class="avatar-sm">{{ initials|default('--') }}</div>
     </div>
   </nav>
 
   <div class="page-body">
 
-    <div class="welcome-row">
+    <div class="welcome-row" style="flex-wrap: wrap;">
       <div>
         <div class="welcome-title">Welcome back,<br><span>{{ first_name|default('User') }}</span>.</div>
         <div class="welcome-sub">Manage your shared expenses and keep things fair across all your groups.</div>
       </div>
-      <div class="net-balance-card">
+      <div class="net-balance-card" style="min-width: 0;">
         <div class="net-balance-label">Net Balance (All Groups)</div>
         <div class="net-balance-amount" style="color: {{ 'var(--accent)' if net_balance >= 0 else 'var(--danger, #e05252)' }}">
           {{ '+' if net_balance >= 0 else '-' }}${{ "%.2f"|format(net_balance|abs) }}
@@ -62,7 +57,6 @@
         <div class="section-title">Active Groups</div>
         <div class="section-sub">Ongoing shared expense spaces</div>
       </div>
-      <a href="#" class="view-all-link">View All <i class="bi bi-chevron-right"></i></a>
     </div>
 
     <div class="groups-grid">
