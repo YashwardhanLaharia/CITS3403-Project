@@ -176,7 +176,7 @@
         {% for t in transfers %}
         <div class="archived-card">
           {% if current_user.id == t.debtor_id %}
-          <form method="POST" action="/groups/{{ group.id }}/settle" style="margin:0;display:flex;align-items:center;width:100%;gap:12px;">
+          <form method="POST" action="/groups/{{ group.id }}/settle" style="margin:0;display:flex;align-items:center;width:100%;gap:12px;" class="settle-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="debtor_id" value="{{ t.debtor_id }}">
             <input type="hidden" name="creditor_id" value="{{ t.creditor_id }}">

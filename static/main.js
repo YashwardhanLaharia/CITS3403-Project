@@ -129,6 +129,10 @@ function renderSettlement(transfers) {
     </div>`;
   }).join('');
 
+  bindSettleForms();
+}
+
+function bindSettleForms() {
   document.querySelectorAll('.settle-form').forEach(form => {
     form.addEventListener('submit', function(e) {
       const groupId = document.querySelector('.main-content')?.dataset.groupId;
@@ -150,6 +154,8 @@ function renderGroupSummary(group, memberCount) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  bindSettleForms();
+
   const form = document.getElementById('addExpenseForm');
   if (!form) return;
 
