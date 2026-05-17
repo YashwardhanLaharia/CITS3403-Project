@@ -725,6 +725,15 @@ def settle(group_id):
         group_id=group_id, user_id=creditor_id
     ).first_or_404()
 
+    split_ids_param = request.form.get('split_ids', '')
+    selected_split_ids = set()
+    if split_ids_param:
+        try:
+            selected_split_ids = set(int(x.strip()) for x in split_ids_param.split(',') if x.strip())
+        except ValueError:
+            flash('Invalid split selection.', 'error')
+            return redirect(url_for('main.group_dashboard', group_id=group_id))
+
     splits = (
         ExpenseSplit.query
         .join(Expense, Expense.id == ExpenseSplit.expense_id)
@@ -749,15 +758,35 @@ def settle(group_id):
         .all()
     )
 
-    if not splits and not cross_splits:
+    if selected_split_ids:
+        splits_to_settle = [s for s in splits if s.id in selected_split_ids]
+        cross_splits_to_settle = [s for s in cross_splits if s.id in selected_split_ids]
+    else:
+        splits_to_settle = splits
+        cross_splits_to_settle = cross_splits
+
+    if not splits_to_settle and not cross_splits_to_settle:
         flash('No outstanding splits found.', 'error')
         return redirect(url_for('main.group_dashboard', group_id=group_id))
 
-    for split in splits:
-        split.is_paid = True
+    splits_total = sum(float(s.share_amount) for s in splits_to_settle)
+    cross_splits_total = sum(float(s.share_amount) for s in cross_splits_to_settle)
+    net_settle = splits_total - cross_splits_total
 
-    for split in cross_splits:
+    remaining = net_settle
+    for split in splits_to_settle:
+        if remaining <= 0:
+            break
         split.is_paid = True
+        remaining -= float(split.share_amount)
+
+    if net_settle < 0:
+        remaining = abs(net_settle)
+        for split in cross_splits_to_settle:
+            if remaining <= 0:
+                break
+            split.is_paid = True
+            remaining -= float(split.share_amount)
 
     db.session.commit()
     flash('Settlement marked as paid.', 'success')
