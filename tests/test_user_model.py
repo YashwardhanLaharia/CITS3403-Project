@@ -26,6 +26,7 @@ def test_check_password_validates_correctly(app):
     assert user.check_password('CorrectPass123!') is True
     assert user.check_password('WrongPass123!') is False
     assert user.check_password('') is False
+    assert user.check_password(None) is False
 
 
 def test_check_password_returns_false_for_empty_hash(app):

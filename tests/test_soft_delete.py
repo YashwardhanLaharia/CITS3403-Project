@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from extensions import db
 from models import User, Group, Membership, Expense, ExpenseSplit
@@ -7,7 +7,7 @@ from models import User, Group, Membership, Expense, ExpenseSplit
 def test_soft_delete_sets_status_and_timestamp(app, user_factory):
     user, _ = user_factory()
     user.status = 'deleted'
-    user.deleted_at = datetime.utcnow()
+    user.deleted_at = datetime.now(timezone.utc)
     user.email = None
     db.session.commit()
 
